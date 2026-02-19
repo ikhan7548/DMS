@@ -88,7 +88,7 @@ export default function LoginPage() {
           </form>
 
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 3 }}>
-            Default: admin / 1234
+            Daycare Management System
           </Typography>
         </CardContent>
       </Card>
