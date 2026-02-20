@@ -142,7 +142,12 @@ router.delete('/:id', requireAuth, (req: Request, res: Response) => {
 
     // Use a transaction to delete all associated data then the child
     const deleteChild = sqlite.transaction(() => {
-      // Delete from all related tables (order doesn't matter within transaction, but delete children refs first)
+      // Get linked parent IDs before removing the links
+      const linkedParents = sqlite.prepare(
+        `SELECT parent_id FROM child_parent WHERE child_id = ?`
+      ).all(childId) as { parent_id: number }[];
+
+      // Delete from all related tables
       sqlite.prepare(`DELETE FROM child_parent WHERE child_id = ?`).run(childId);
       sqlite.prepare(`DELETE FROM emergency_contacts WHERE child_id = ?`).run(childId);
       sqlite.prepare(`DELETE FROM authorized_pickups WHERE child_id = ?`).run(childId);
@@ -153,8 +158,18 @@ router.delete('/:id', requireAuth, (req: Request, res: Response) => {
       sqlite.prepare(`DELETE FROM meal_log_children WHERE child_id = ?`).run(childId);
       sqlite.prepare(`DELETE FROM invoice_line_items WHERE child_id = ?`).run(childId);
 
-      // Finally delete the child record itself
+      // Delete the child record itself
       sqlite.prepare(`DELETE FROM children WHERE id = ?`).run(childId);
+
+      // Clean up orphaned parents (parents with no remaining children)
+      for (const { parent_id } of linkedParents) {
+        const remaining = sqlite.prepare(
+          `SELECT COUNT(*) as count FROM child_parent WHERE parent_id = ?`
+        ).get(parent_id) as { count: number };
+        if (remaining.count === 0) {
+          sqlite.prepare(`DELETE FROM parents WHERE id = ?`).run(parent_id);
+        }
+      }
     });
 
     deleteChild();

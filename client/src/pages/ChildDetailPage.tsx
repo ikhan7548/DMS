@@ -540,6 +540,7 @@ export default function ChildDetailPage() {
             This will <strong>permanently delete</strong> {child.first_name} {child.last_name} and <strong>all associated data</strong> including:
           </Typography>
           <Typography component="ul" variant="body2" sx={{ pl: 2, mb: 2 }}>
+            <li>Parent/guardian records (if not linked to other children)</li>
             <li>Emergency contacts</li>
             <li>Authorized pickups</li>
             <li>Immunization records</li>
