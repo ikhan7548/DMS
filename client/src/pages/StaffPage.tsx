@@ -34,7 +34,15 @@ export default function StaffPage() {
   const resetForm = () => setForm({ first_name: '', last_name: '', position: '', email: '', phone: '', hire_date: new Date().toISOString().split('T')[0], hourly_rate: '' });
 
   const handleCreate = () => {
-    createMutation.mutate({ ...form, hourly_rate: form.hourly_rate ? parseFloat(form.hourly_rate) : null });
+    createMutation.mutate({
+      firstName: form.first_name,
+      lastName: form.last_name,
+      position: form.position || 'assistant',
+      email: form.email || null,
+      phone: form.phone || null,
+      hireDate: form.hire_date,
+      hourlyRate: form.hourly_rate ? parseFloat(form.hourly_rate) : null,
+    });
   };
 
   return (

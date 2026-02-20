@@ -48,14 +48,17 @@ if not exist ".env" if exist ".env.example" (
 :: Create data directory if it doesn't exist
 if not exist "data" mkdir data
 
+:: Check if this is a fresh install (no DB yet) before migration creates it
+set NEEDS_SEED=0
+if not exist "data\daycare.db" set NEEDS_SEED=1
+
 :: Run database migration
 echo Running database migration...
 call npm run db:migrate
 echo.
 
-:: Seed database if it doesn't exist yet (migration will create it)
-if not exist "data\daycare.db" goto :seed_db
-goto :after_seed
+:: Seed database only on first run (fresh install)
+if "%NEEDS_SEED%"=="0" goto :after_seed
 
 :seed_db
 echo Seeding database with initial data...

@@ -7,7 +7,18 @@ const router = Router();
 // GET /api/parents
 router.get('/', requireAuth, (req: Request, res: Response) => {
   try {
-    const parents = sqlite.prepare(`SELECT * FROM parents ORDER BY last_name, first_name`).all() as any[];
+    const { search } = req.query;
+    let query = `SELECT * FROM parents WHERE 1=1`;
+    const params: any[] = [];
+
+    if (search) {
+      query += ` AND (first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone_cell LIKE ?)`;
+      const s = `%${search}%`;
+      params.push(s, s, s, s);
+    }
+    query += ` ORDER BY last_name, first_name`;
+
+    const parents = sqlite.prepare(query).all(...params) as any[];
 
     // Attach linked children names for each parent
     const childQuery = sqlite.prepare(

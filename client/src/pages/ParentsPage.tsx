@@ -15,8 +15,8 @@ export default function ParentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '', address: '',
-    relationship: 'parent', employer: '', work_phone: '', notes: '',
+    first_name: '', last_name: '', email: '', phone_cell: '', home_address: '',
+    relationship: 'parent', employer_name: '', employer_phone: '', notes: '',
   });
 
   const { data: parents = [], isLoading } = useQuery({
@@ -25,21 +25,35 @@ export default function ParentsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => editId ? api.put(`/parents/${editId}`, data) : api.post('/parents', data),
+    mutationFn: (data: any) => {
+      // Map form field names to what the API expects
+      const payload = {
+        firstName: data.first_name,
+        lastName: data.last_name,
+        email: data.email || null,
+        phoneCell: data.phone_cell || null,
+        homeAddress: data.home_address || null,
+        relationship: data.relationship || 'parent',
+        employerName: data.employer_name || null,
+        employerPhone: data.employer_phone || null,
+        notes: data.notes || null,
+      };
+      return editId ? api.put(`/parents/${editId}`, payload) : api.post('/parents', payload);
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['parents'] }); setDialogOpen(false); resetForm(); },
   });
 
   const resetForm = () => {
     setEditId(null);
-    setForm({ first_name: '', last_name: '', email: '', phone: '', address: '', relationship: 'parent', employer: '', work_phone: '', notes: '' });
+    setForm({ first_name: '', last_name: '', email: '', phone_cell: '', home_address: '', relationship: 'parent', employer_name: '', employer_phone: '', notes: '' });
   };
 
   const handleEdit = (p: any) => {
     setEditId(p.id);
     setForm({
       first_name: p.first_name || '', last_name: p.last_name || '', email: p.email || '',
-      phone: p.phone || '', address: p.address || '', relationship: p.relationship || 'parent',
-      employer: p.employer || '', work_phone: p.work_phone || '', notes: p.notes || '',
+      phone_cell: p.phone_cell || '', home_address: p.home_address || '', relationship: p.relationship || 'parent',
+      employer_name: p.employer_name || '', employer_phone: p.employer_phone || '', notes: p.notes || '',
     });
     setDialogOpen(true);
   };
@@ -84,7 +98,7 @@ export default function ParentsPage() {
                   <TableRow key={p.id} hover sx={{ cursor: 'pointer' }} onClick={() => handleEdit(p)}>
                     <TableCell sx={{ fontWeight: 500 }}>{p.first_name} {p.last_name}</TableCell>
                     <TableCell>{p.email}</TableCell>
-                    <TableCell>{p.phone}</TableCell>
+                    <TableCell>{p.phone_cell}</TableCell>
                     <TableCell><Chip label={p.relationship || 'parent'} size="small" variant="outlined" /></TableCell>
                     <TableCell>
                       {(p.children_names || []).length > 0
@@ -114,11 +128,11 @@ export default function ParentsPage() {
               <TextField label="Last Name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} fullWidth required />
             </Box>
             <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <TextField label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            <TextField label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} multiline rows={2} />
+            <TextField label="Phone" value={form.phone_cell} onChange={(e) => setForm({ ...form, phone_cell: e.target.value })} />
+            <TextField label="Address" value={form.home_address} onChange={(e) => setForm({ ...form, home_address: e.target.value })} multiline rows={2} />
             <TextField label="Relationship" value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} placeholder="parent, guardian, etc." />
-            <TextField label="Employer" value={form.employer} onChange={(e) => setForm({ ...form, employer: e.target.value })} />
-            <TextField label="Work Phone" value={form.work_phone} onChange={(e) => setForm({ ...form, work_phone: e.target.value })} />
+            <TextField label="Employer" value={form.employer_name} onChange={(e) => setForm({ ...form, employer_name: e.target.value })} />
+            <TextField label="Work Phone" value={form.employer_phone} onChange={(e) => setForm({ ...form, employer_phone: e.target.value })} />
             <TextField label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} multiline rows={2} />
           </Box>
         </DialogContent>

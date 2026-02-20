@@ -16,13 +16,17 @@ interface ChildDetail {
   last_name: string;
   nickname: string;
   date_of_birth: string;
-  gender: string;
-  schedule_type: string;
+  sex: string;
+  expected_schedule: string;
   status: string;
   allergies: string;
-  medical_notes: string;
   notes: string;
   enrollment_date: string;
+  home_address: string;
+  physician_name: string;
+  physician_phone: string;
+  medical_insurance: string;
+  dietary_restrictions: string;
   parents: any[];
   emergencyContacts: any[];
   authorizedPickups: any[];
@@ -300,7 +304,7 @@ export default function ChildDetailPage() {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
             <Chip label={child.status} size="small" color={child.status === 'active' ? 'success' : 'default'} />
-            <Chip label={child.schedule_type?.replace('_', ' ')} size="small" variant="outlined" />
+            <Chip label={child.expected_schedule?.replace('_', ' ')} size="small" variant="outlined" />
             <Chip label={calculateAge(child.date_of_birth)} size="small" variant="outlined" />
           </Box>
         </Box>
@@ -325,8 +329,8 @@ export default function ChildDetailPage() {
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2 }}>Personal Information</Typography>
                 <InfoRow label="Date of Birth" value={child.date_of_birth} />
-                <InfoRow label="Gender" value={child.gender} />
-                <InfoRow label="Schedule" value={child.schedule_type?.replace('_', ' ')} />
+                <InfoRow label="Gender" value={child.sex} />
+                <InfoRow label="Schedule" value={child.expected_schedule?.replace('_', ' ')} />
                 <InfoRow label="Enrolled" value={child.enrollment_date} />
               </CardContent>
             </Card>
@@ -336,7 +340,8 @@ export default function ChildDetailPage() {
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2 }}>Medical Information</Typography>
                 <InfoRow label="Allergies" value={child.allergies || 'None'} />
-                <InfoRow label="Medical Notes" value={child.medical_notes || 'None'} />
+                <InfoRow label="Dietary Restrictions" value={child.dietary_restrictions || 'None'} />
+                <InfoRow label="Physician" value={child.physician_name || 'None'} />
                 <InfoRow label="Notes" value={child.notes || 'None'} />
               </CardContent>
             </Card>
@@ -545,7 +550,7 @@ export default function ChildDetailPage() {
             <TextField label="Last Name" value={editForm.last_name || ''} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} />
             <TextField label="Nickname" value={editForm.nickname || ''} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} />
             <TextField label="Allergies" value={editForm.allergies || ''} onChange={(e) => setEditForm({ ...editForm, allergies: e.target.value })} multiline rows={2} />
-            <TextField label="Medical Notes" value={editForm.medical_notes || ''} onChange={(e) => setEditForm({ ...editForm, medical_notes: e.target.value })} multiline rows={2} />
+            <TextField label="Dietary Restrictions" value={editForm.dietary_restrictions || ''} onChange={(e) => setEditForm({ ...editForm, dietary_restrictions: e.target.value })} multiline rows={2} />
             <TextField label="Notes" value={editForm.notes || ''} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} multiline rows={2} />
           </Box>
         </DialogContent>
