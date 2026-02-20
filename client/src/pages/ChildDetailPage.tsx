@@ -6,7 +6,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
   IconButton, LinearProgress, Alert, Paper, Snackbar, Tooltip,
 } from '@mui/material';
-import { ArrowBack, Edit, Add, Delete, Phone, Email, Warning } from '@mui/icons-material';
+import { ArrowBack, Edit, Add, Delete, Phone, Email, Warning, Link, LinkOff } from '@mui/icons-material';
+import { Autocomplete } from '@mui/material';
 import api from '../lib/api';
 
 interface ChildDetail {
@@ -75,6 +76,14 @@ export default function ChildDetailPage() {
   // Delete child confirmation
   const [deleteChildOpen, setDeleteChildOpen] = useState(false);
   const [deleteChildConfirmText, setDeleteChildConfirmText] = useState('');
+
+  // Parent linking
+  const [parentDialog, setParentDialog] = useState(false);
+  const [allParents, setAllParents] = useState<any[]>([]);
+  const [selectedParent, setSelectedParent] = useState<any>(null);
+  const [parentRelationship, setParentRelationship] = useState('');
+  const [createNewParent, setCreateNewParent] = useState(false);
+  const [newParentForm, setNewParentForm] = useState({ first_name: '', last_name: '', email: '', phone: '', relationship: '' });
 
   const fetchChild = () => {
     setLoading(true);
@@ -209,6 +218,7 @@ export default function ChildDetailPage() {
     if (deleteDialog.type === 'contact') handleDeleteContact(deleteDialog.id);
     else if (deleteDialog.type === 'pickup') handleDeletePickup(deleteDialog.id);
     else if (deleteDialog.type === 'immunization') handleDeleteImmun(deleteDialog.id);
+    else if (deleteDialog.type === 'parent') handleConfirmUnlinkParent(deleteDialog.id);
   };
 
   // ─── Delete entire child record ────────────────────
@@ -218,6 +228,60 @@ export default function ChildDetailPage() {
       navigate('/children');
     } catch {
       setSnack('Failed to delete child');
+    }
+  };
+
+  // ─── Parent Linking ───────────────────────────────
+  const openLinkParent = async () => {
+    try {
+      const res = await api.get('/parents');
+      // Filter out already-linked parents
+      const linkedIds = new Set((child?.parents || []).map((p: any) => p.id));
+      setAllParents(res.data.filter((p: any) => !linkedIds.has(p.id)));
+    } catch {}
+    setSelectedParent(null);
+    setParentRelationship('');
+    setCreateNewParent(false);
+    setNewParentForm({ first_name: '', last_name: '', email: '', phone: '', relationship: '' });
+    setParentDialog(true);
+  };
+
+  const handleLinkParent = async () => {
+    try {
+      if (createNewParent) {
+        // Create new parent then link
+        const res = await api.post('/parents', {
+          firstName: newParentForm.first_name,
+          lastName: newParentForm.last_name,
+          email: newParentForm.email || null,
+          phoneCell: newParentForm.phone || null,
+          relationship: newParentForm.relationship || 'parent',
+        });
+        await api.post(`/parents/${res.data.id}/link/${id}`, { relationship: newParentForm.relationship || 'parent' });
+        setSnack('Parent created and linked');
+      } else if (selectedParent) {
+        await api.post(`/parents/${selectedParent.id}/link/${id}`, { relationship: parentRelationship || null });
+        setSnack('Parent linked');
+      }
+      setParentDialog(false);
+      fetchChild();
+    } catch {
+      setSnack('Failed to link parent');
+    }
+  };
+
+  const handleUnlinkParent = async (parentId: number, parentName: string) => {
+    setDeleteDialog({ type: 'parent', id: parentId, name: parentName });
+  };
+
+  const handleConfirmUnlinkParent = async (parentId: number) => {
+    try {
+      await api.delete(`/parents/${parentId}/unlink/${id}`);
+      setSnack('Parent unlinked');
+      setDeleteDialog(null);
+      fetchChild();
+    } catch {
+      setSnack('Failed to unlink parent');
     }
   };
 
@@ -247,10 +311,10 @@ export default function ChildDetailPage() {
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label="Details" />
+        <Tab label="Parents" />
         <Tab label="Emergency Contacts" />
         <Tab label="Authorized Pickups" />
         <Tab label="Immunizations" />
-        <Tab label="Parents" />
       </Tabs>
 
       {/* Details Tab */}
@@ -280,8 +344,56 @@ export default function ChildDetailPage() {
         </Grid>
       )}
 
-      {/* Emergency Contacts Tab */}
+      {/* Parents Tab */}
       {tab === 1 && (
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6">Parents / Guardians</Typography>
+              <Button startIcon={<Add />} variant="contained" size="small" onClick={openLinkParent}>
+                Add Parent
+              </Button>
+            </Box>
+            {(child.parents || []).length === 0 ? (
+              <Typography color="text.secondary">No parents linked. Click "Add Parent" to link an existing parent or create a new one.</Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Relationship</TableCell>
+                      <TableCell>Phone</TableCell>
+                      <TableCell>Email</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {child.parents.map((p: any) => (
+                      <TableRow key={p.id}>
+                        <TableCell sx={{ fontWeight: 500 }}>{p.first_name} {p.last_name}</TableCell>
+                        <TableCell>{p.relationship || '-'}</TableCell>
+                        <TableCell>{p.phone_cell || p.phone || '-'}</TableCell>
+                        <TableCell>{p.email || '-'}</TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Unlink parent">
+                            <IconButton size="small" color="error" onClick={() => handleUnlinkParent(p.id, `${p.first_name} ${p.last_name}`)}>
+                              <LinkOff fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Emergency Contacts Tab */}
+      {tab === 2 && (
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -331,7 +443,7 @@ export default function ChildDetailPage() {
       )}
 
       {/* Authorized Pickups Tab */}
-      {tab === 2 && (
+      {tab === 3 && (
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -377,7 +489,7 @@ export default function ChildDetailPage() {
       )}
 
       {/* Immunizations Tab */}
-      {tab === 3 && (
+      {tab === 4 && (
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -420,31 +532,6 @@ export default function ChildDetailPage() {
                 </TableBody>
               </Table>
             </TableContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Parents Tab */}
-      {tab === 4 && (
-        <Card>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2 }}>Parents / Guardians</Typography>
-            {(child.parents || []).length === 0 ? (
-              <Typography color="text.secondary">No parents linked</Typography>
-            ) : (
-              <Grid container spacing={2}>
-                {child.parents.map((p: any) => (
-                  <Grid size={{ xs: 12, md: 6 }} key={p.id}>
-                    <Paper variant="outlined" sx={{ p: 2 }}>
-                      <Typography variant="subtitle1" fontWeight={600}>{p.first_name} {p.last_name}</Typography>
-                      <Typography variant="body2">{p.relationship}</Typography>
-                      {p.phone && <Typography variant="body2"><Phone sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />{p.phone}</Typography>}
-                      {p.email && <Typography variant="body2"><Email sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />{p.email}</Typography>}
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            )}
           </CardContent>
         </Card>
       )}
@@ -568,6 +655,69 @@ export default function ChildDetailPage() {
             onClick={handleDeleteChild}
           >
             Permanently Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Link Parent Dialog */}
+      <Dialog open={parentDialog} onClose={() => setParentDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Parent / Guardian</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant={!createNewParent ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setCreateNewParent(false)}
+              >
+                Link Existing
+              </Button>
+              <Button
+                variant={createNewParent ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setCreateNewParent(true)}
+              >
+                Create New
+              </Button>
+            </Box>
+
+            {!createNewParent ? (
+              <>
+                <Autocomplete
+                  options={allParents}
+                  getOptionLabel={(p: any) => `${p.first_name} ${p.last_name}${p.email ? ` (${p.email})` : ''}`}
+                  value={selectedParent}
+                  onChange={(_, v) => setSelectedParent(v)}
+                  renderInput={(params) => <TextField {...params} label="Select Parent" placeholder="Search by name..." />}
+                />
+                <TextField
+                  label="Relationship to Child"
+                  value={parentRelationship}
+                  onChange={(e) => setParentRelationship(e.target.value)}
+                  placeholder="e.g., mother, father, guardian"
+                />
+              </>
+            ) : (
+              <>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField label="First Name" value={newParentForm.first_name} onChange={(e) => setNewParentForm({ ...newParentForm, first_name: e.target.value })} fullWidth required />
+                  <TextField label="Last Name" value={newParentForm.last_name} onChange={(e) => setNewParentForm({ ...newParentForm, last_name: e.target.value })} fullWidth required />
+                </Box>
+                <TextField label="Email" value={newParentForm.email} onChange={(e) => setNewParentForm({ ...newParentForm, email: e.target.value })} />
+                <TextField label="Phone" value={newParentForm.phone} onChange={(e) => setNewParentForm({ ...newParentForm, phone: e.target.value })} />
+                <TextField label="Relationship" value={newParentForm.relationship} onChange={(e) => setNewParentForm({ ...newParentForm, relationship: e.target.value })} placeholder="e.g., mother, father, guardian" />
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setParentDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleLinkParent}
+            disabled={!createNewParent ? !selectedParent : (!newParentForm.first_name.trim() || !newParentForm.last_name.trim())}
+          >
+            {createNewParent ? 'Create & Link' : 'Link Parent'}
           </Button>
         </DialogActions>
       </Dialog>

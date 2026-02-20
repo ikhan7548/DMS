@@ -76,7 +76,7 @@ export default function ParentsPage() {
                   <TableCell>Email</TableCell>
                   <TableCell>Phone</TableCell>
                   <TableCell>Relationship</TableCell>
-                  <TableCell>Employer</TableCell>
+                  <TableCell>Children</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -86,7 +86,14 @@ export default function ParentsPage() {
                     <TableCell>{p.email}</TableCell>
                     <TableCell>{p.phone}</TableCell>
                     <TableCell><Chip label={p.relationship || 'parent'} size="small" variant="outlined" /></TableCell>
-                    <TableCell>{p.employer || '-'}</TableCell>
+                    <TableCell>
+                      {(p.children_names || []).length > 0
+                        ? (p.children_names as string[]).map((name: string, i: number) => (
+                            <Chip key={i} label={name} size="small" variant="outlined" sx={{ mr: 0.5, mb: 0.5 }} />
+                          ))
+                        : <Typography variant="body2" color="text.secondary">--</Typography>
+                      }
+                    </TableCell>
                   </TableRow>
                 ))}
                 {parents.length === 0 && (

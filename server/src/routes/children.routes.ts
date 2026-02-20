@@ -22,8 +22,26 @@ router.get('/', requireAuth, (req: Request, res: Response) => {
     }
     query += ` ORDER BY c.first_name, c.last_name`;
 
-    const children = sqlite.prepare(query).all(...params);
-    res.json(children);
+    const children = sqlite.prepare(query).all(...params) as any[];
+
+    // Attach primary parent info for each child
+    const parentQuery = sqlite.prepare(
+      `SELECT p.first_name, p.last_name, p.phone_cell, p.email, cp.relationship
+       FROM parents p JOIN child_parent cp ON p.id = cp.parent_id
+       WHERE cp.child_id = ? ORDER BY p.is_primary DESC LIMIT 1`
+    );
+    const enriched = children.map((child) => {
+      const parent = parentQuery.get(child.id) as any;
+      return {
+        ...child,
+        parent_name: parent ? `${parent.first_name} ${parent.last_name}` : null,
+        parent_phone: parent?.phone_cell || null,
+        parent_email: parent?.email || null,
+        parent_relationship: parent?.relationship || null,
+      };
+    });
+
+    res.json(enriched);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

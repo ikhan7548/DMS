@@ -24,6 +24,9 @@ interface Child {
   notes: string | null;
   enrollment_date: string;
   fee_tier_name: string | null;
+  parent_name: string | null;
+  parent_phone: string | null;
+  parent_email: string | null;
 }
 
 interface ChildFormData {
@@ -309,7 +312,7 @@ export default function ChildrenPage() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Nickname</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Parent / Guardian</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>DOB</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Age</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Schedule</TableCell>
@@ -345,9 +348,16 @@ export default function ChildrenPage() {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {child.nickname || '--'}
-                      </Typography>
+                      {child.parent_name ? (
+                        <Box>
+                          <Typography variant="body2" fontWeight={500}>{child.parent_name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {[child.parent_phone, child.parent_email].filter(Boolean).join(' | ') || ''}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">--</Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">

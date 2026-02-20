@@ -7,8 +7,23 @@ const router = Router();
 // GET /api/parents
 router.get('/', requireAuth, (req: Request, res: Response) => {
   try {
-    const parents = sqlite.prepare(`SELECT * FROM parents ORDER BY last_name, first_name`).all();
-    res.json(parents);
+    const parents = sqlite.prepare(`SELECT * FROM parents ORDER BY last_name, first_name`).all() as any[];
+
+    // Attach linked children names for each parent
+    const childQuery = sqlite.prepare(
+      `SELECT c.id, c.first_name, c.last_name FROM children c
+       JOIN child_parent cp ON c.id = cp.child_id
+       WHERE cp.parent_id = ? ORDER BY c.first_name`
+    );
+    const enriched = parents.map((parent) => {
+      const children = childQuery.all(parent.id) as any[];
+      return {
+        ...parent,
+        children_names: children.map((c) => `${c.first_name} ${c.last_name}`),
+      };
+    });
+
+    res.json(enriched);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -75,6 +90,18 @@ router.post('/:id/link/:childId', requireAuth, (req: Request, res: Response) => 
     sqlite.prepare(
       `INSERT INTO child_parent (child_id, parent_id, relationship) VALUES (?, ?, ?)`
     ).run(req.params.childId, req.params.id, relationship || null);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/parents/:id/unlink/:childId - Unlink parent from child
+router.delete('/:id/unlink/:childId', requireAuth, (req: Request, res: Response) => {
+  try {
+    sqlite.prepare(
+      `DELETE FROM child_parent WHERE parent_id = ? AND child_id = ?`
+    ).run(req.params.id, req.params.childId);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
