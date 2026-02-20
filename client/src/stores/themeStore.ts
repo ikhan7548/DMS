@@ -8,7 +8,7 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
-  mode: (localStorage.getItem('themeMode') as 'light' | 'dark') || 'light',
+  mode: (localStorage.getItem('themeMode') as 'light' | 'dark') || 'dark',
   primaryColor: localStorage.getItem('primaryColor') || '#1565C0',
 
   toggleMode: () =>
