@@ -47,11 +47,11 @@ Convert the existing HDMA Electron desktop application into a self-hosted web ap
 
 | Layer | Technology | Notes |
 |-------|-----------|-------|
-| Frontend | React 19 + MUI + TypeScript | Reuse existing components |
+| Frontend | React 19 + MUI v6 + TypeScript + Vite 6 | Reuse existing components |
 | Backend | Express.js + TypeScript | New - replaces Electron main process |
-| Database | PostgreSQL 16 | New - replaces SQLite |
-| ORM | Drizzle ORM | Reuse schema, adapt for PostgreSQL |
-| Container | Docker + docker-compose | New |
+| Database | SQLite via better-sqlite3 | Kept same as HDMA |
+| Database Access | Raw SQL queries | No ORM query builder |
+| Deployment | TrueNAS Core VM (Ubuntu Server) + systemd | Docker available as alternative |
 | Server | TrueNAS (user's existing hardware) | Existing |
 
 ---
@@ -66,21 +66,22 @@ Convert the existing HDMA Electron desktop application into a self-hosted web ap
 - TypeScript support
 - Maps naturally from Electron IPC handlers to Express route handlers
 
-### 2.2 Why PostgreSQL (Database)
+### 2.2 Why SQLite (Database)
 
-- Robust concurrent access for multi-user web app
-- Runs as Docker container alongside the app
-- Drizzle ORM supports PostgreSQL with minimal schema changes
-- Better for production web workloads than SQLite
-- TrueNAS can run PostgreSQL natively or in Docker
+- Same database engine as HDMA v1.0, zero migration effort
+- Single file, simple backup (just copy the .db file)
+- better-sqlite3 is fast and synchronous
+- WAL mode handles concurrent reads from multiple users
+- Sufficient for a family day home with 5-10 concurrent users
+- No separate database server to manage
 
-### 2.3 Why Docker (Deployment)
+### 2.3 Why TrueNAS VM + Systemd (Deployment)
 
-- TrueNAS Scale has native Docker/Kubernetes support
-- TrueNAS Core can run Docker via a VM (e.g., Debian VM with Docker)
-- Reproducible, portable deployment
-- Easy updates: pull new image, restart container
-- Isolates the application from the host system
+- TrueNAS Core doesn't support Docker natively (jail approach had networking issues)
+- Ubuntu Server VM with bridged networking works reliably
+- Systemd service provides auto-start and auto-restart
+- Simple update workflow: git pull → build → restart
+- Docker Compose available as alternative for TrueNAS Scale
 
 ### 2.4 Why REST API (Not tRPC/GraphQL)
 
@@ -94,20 +95,19 @@ Convert the existing HDMA Electron desktop application into a self-hosted web ap
 
 ## 3. Development Phases
 
-| Phase | Description | Estimated Sessions |
-|-------|-------------|-------------------|
-| **Phase 1** | Project Scaffolding & Infrastructure | 2-3 sessions |
-| **Phase 2** | Authentication & User Management | 2-3 sessions |
-| **Phase 3** | Core Modules - Children & Staff | 3-4 sessions |
-| **Phase 4** | Attendance & Virginia Point System | 2-3 sessions |
-| **Phase 5** | Billing & Invoicing | 4-5 sessions |
-| **Phase 6** | Dashboard & Reports | 2-3 sessions |
-| **Phase 7** | Settings & Administration | 3-4 sessions |
-| **Phase 8** | Docker & TrueNAS Deployment | 2-3 sessions |
-| **Phase 9** | Testing & Polish | 3-4 sessions |
-| **Total** | | **23-32 sessions** |
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **Phase 1** | Project Scaffolding & Infrastructure | **COMPLETE** |
+| **Phase 2** | Authentication & User Management | **COMPLETE** |
+| **Phase 3** | Core Modules - Children & Staff | **COMPLETE** |
+| **Phase 4** | Attendance & Virginia Point System | **COMPLETE** |
+| **Phase 5** | Billing & Invoicing | **COMPLETE** |
+| **Phase 6** | Dashboard & Reports | **COMPLETE** |
+| **Phase 7** | Settings & Administration | **COMPLETE** |
+| **Phase 8** | TrueNAS Deployment | **COMPLETE** |
+| **Phase 9** | Testing & Polish | **COMPLETE** |
 
-A "session" is one working period with Claude doing the development. Each session typically covers one focused area.
+All phases completed in February 2026. Development done with Claude Code (AI-assisted).
 
 ---
 
@@ -115,40 +115,37 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 4.1 Tasks
 
-- [ ] Initialize monorepo or multi-package project structure
-- [ ] Set up backend (Express.js + TypeScript)
-  - [ ] Create `server/` directory with Express app
-  - [ ] Configure TypeScript for backend
-  - [ ] Set up middleware stack (CORS, body-parser, cookie-parser, express-session)
-  - [ ] Set up error handling middleware
-  - [ ] Set up logging (morgan or pino)
-  - [ ] Create health check endpoint (`GET /api/health`)
-- [ ] Set up frontend (Vite + React)
-  - [ ] Create `client/` directory with Vite React app
-  - [ ] Configure TypeScript for frontend
-  - [ ] Install MUI, Zustand, React Router, i18next, jsPDF
-  - [ ] Copy shared constants from HDMA (roles, virginia-points, billing)
-  - [ ] Copy i18n translation files from HDMA
-  - [ ] Set up API client utility (axios or fetch wrapper)
-- [ ] Set up database
-  - [ ] Configure Drizzle ORM for PostgreSQL
-  - [ ] Migrate schema from HDMA SQLite to PostgreSQL (adapt types)
-  - [ ] Create migration files
-  - [ ] Set up database connection with environment variables
-  - [ ] Port seed data script
-- [ ] Set up Docker
-  - [ ] Create `Dockerfile` for the application
-  - [ ] Create `docker-compose.yml` with app + PostgreSQL
-  - [ ] Configure volume mounts for data persistence
-  - [ ] Test container builds and starts
+- [x] Initialize monorepo or multi-package project structure
+- [x] Set up backend (Express.js + TypeScript)
+  - [x] Create `server/` directory with Express app
+  - [x] Configure TypeScript for backend
+  - [x] Set up middleware stack (CORS, body-parser, cookie-parser, express-session)
+  - [x] Set up error handling middleware
+  - [x] Set up logging (morgan)
+  - [x] Create health check endpoint (`GET /api/health`)
+- [x] Set up frontend (Vite + React)
+  - [x] Create `client/` directory with Vite React app
+  - [x] Configure TypeScript for frontend
+  - [x] Install MUI, Zustand, React Router, dayjs, @tanstack/react-query
+  - [x] Copy shared constants from HDMA (roles, virginia-points, billing)
+  - [x] Set up API client utility (axios)
+- [x] Set up database
+  - [x] Configure better-sqlite3 with raw SQL
+  - [x] Create migration file with CREATE TABLE IF NOT EXISTS
+  - [x] Set up database connection (data/daycare.db)
+  - [x] Port seed data script
+- [x] Set up Docker (optional)
+  - [x] Create `Dockerfile` for the application
+  - [x] Create `docker-compose.yml`
+  - [x] Configure volume mounts for data persistence
 
 ### 4.2 Deliverables
 
-- Working project structure with both frontend and backend
-- Database schema deployed to PostgreSQL
-- Docker containers build and start successfully
-- Health check endpoint responds
-- Frontend loads in browser with MUI rendering
+- ✅ Working project structure with both frontend and backend
+- ✅ Database schema deployed to SQLite (28 tables)
+- ✅ Health check endpoint responds
+- ✅ Frontend loads in browser with MUI rendering
+- ✅ Docker config available (optional)
 
 ---
 
@@ -156,32 +153,32 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 5.1 Tasks
 
-- [ ] Backend: Authentication routes
-  - [ ] `POST /api/auth/login` - Validate username + PIN, create session
-  - [ ] `POST /api/auth/logout` - Destroy session
-  - [ ] `GET /api/auth/session` - Return current user info
-  - [ ] Configure express-session with secure settings
-  - [ ] Implement bcryptjs PIN hashing (port from HDMA auth.service)
-- [ ] Backend: Auth middleware
-  - [ ] `requireAuth` middleware - check session exists
-  - [ ] `requirePermission(permission)` middleware - check role-based access
-  - [ ] `requireRole(roles)` middleware - check user role
-- [ ] Backend: User management routes
-  - [ ] `GET /api/settings/users` - List all users
-  - [ ] `POST /api/settings/users` - Create user
-  - [ ] `PUT /api/settings/users/:id` - Update user
-  - [ ] `PUT /api/settings/users/:id/pin` - Reset PIN
-- [ ] Frontend: Login page
-  - [ ] Port `LoginPage.tsx` from HDMA
-  - [ ] Replace `window.api.auth.login()` with API call
-  - [ ] Update `useAuthStore` to use API calls
-- [ ] Frontend: Protected routes
-  - [ ] Port `ProtectedRoute.tsx` from HDMA
-  - [ ] Update to check session via API on app load
-  - [ ] Redirect to login if not authenticated
-- [ ] Frontend: User management UI
-  - [ ] Port user management section from SettingsPage
-  - [ ] Replace IPC calls with API calls
+- [x]Backend: Authentication routes
+  - [x]`POST /api/auth/login` - Validate username + PIN, create session
+  - [x]`POST /api/auth/logout` - Destroy session
+  - [x]`GET /api/auth/session` - Return current user info
+  - [x]Configure express-session with secure settings
+  - [x]Implement bcryptjs PIN hashing (port from HDMA auth.service)
+- [x]Backend: Auth middleware
+  - [x]`requireAuth` middleware - check session exists
+  - [x]`requirePermission(permission)` middleware - check role-based access
+  - [x]`requireRole(roles)` middleware - check user role
+- [x]Backend: User management routes
+  - [x]`GET /api/settings/users` - List all users
+  - [x]`POST /api/settings/users` - Create user
+  - [x]`PUT /api/settings/users/:id` - Update user
+  - [x]`PUT /api/settings/users/:id/pin` - Reset PIN
+- [x]Frontend: Login page
+  - [x]Port `LoginPage.tsx` from HDMA
+  - [x]Replace `window.api.auth.login()` with API call
+  - [x]Update `useAuthStore` to use API calls
+- [x]Frontend: Protected routes
+  - [x]Port `ProtectedRoute.tsx` from HDMA
+  - [x]Update to check session via API on app load
+  - [x]Redirect to login if not authenticated
+- [x]Frontend: User management UI
+  - [x]Port user management section from SettingsPage
+  - [x]Replace IPC calls with API calls
 
 ### 5.2 Deliverables
 
@@ -197,38 +194,38 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 6.1 Tasks - Children
 
-- [ ] Backend: Children API routes
-  - [ ] `GET /api/children` - List with search/filter
-  - [ ] `POST /api/children` - Create child
-  - [ ] `GET /api/children/:id` - Get details with relations
-  - [ ] `PUT /api/children/:id` - Update child
-  - [ ] `DELETE /api/children/:id` - Archive/delete child
-- [ ] Backend: Parents API routes
-  - [ ] `GET /api/parents` - List parents
-  - [ ] `POST /api/parents` - Create parent
-  - [ ] `POST /api/parents/:id/link/:childId` - Link parent to child
-  - [ ] `PUT /api/parents/:id` - Update parent
-  - [ ] `DELETE /api/parents/:id` - Delete parent
-- [ ] Backend: Emergency contacts & authorized pickups routes
-- [ ] Backend: Immunizations routes
-- [ ] Frontend: Port child components
-  - [ ] `ChildListPage.tsx` - Replace IPC with API calls
-  - [ ] `ChildEnrollmentForm.tsx` - Replace IPC with API calls
-  - [ ] `ChildDetailPage.tsx` - Replace IPC with API calls
+- [x]Backend: Children API routes
+  - [x]`GET /api/children` - List with search/filter
+  - [x]`POST /api/children` - Create child
+  - [x]`GET /api/children/:id` - Get details with relations
+  - [x]`PUT /api/children/:id` - Update child
+  - [x]`DELETE /api/children/:id` - Archive/delete child
+- [x]Backend: Parents API routes
+  - [x]`GET /api/parents` - List parents
+  - [x]`POST /api/parents` - Create parent
+  - [x]`POST /api/parents/:id/link/:childId` - Link parent to child
+  - [x]`PUT /api/parents/:id` - Update parent
+  - [x]`DELETE /api/parents/:id` - Delete parent
+- [x]Backend: Emergency contacts & authorized pickups routes
+- [x]Backend: Immunizations routes
+- [x]Frontend: Port child components
+  - [x]`ChildListPage.tsx` - Replace IPC with API calls
+  - [x]`ChildEnrollmentForm.tsx` - Replace IPC with API calls
+  - [x]`ChildDetailPage.tsx` - Replace IPC with API calls
 
 ### 6.2 Tasks - Staff
 
-- [ ] Backend: Staff API routes
-  - [ ] `GET /api/staff` - List with search/filter
-  - [ ] `POST /api/staff` - Create staff
-  - [ ] `GET /api/staff/:id` - Get details with certifications and background checks
-  - [ ] `PUT /api/staff/:id` - Update staff
-- [ ] Backend: Staff certifications routes
-- [ ] Backend: Background checks routes
-- [ ] Frontend: Port staff components
-  - [ ] `StaffListPage.tsx` - Replace IPC with API calls
-  - [ ] `StaffEnrollmentForm.tsx` - Replace IPC with API calls
-  - [ ] `StaffDetailPage.tsx` - Replace IPC with API calls
+- [x]Backend: Staff API routes
+  - [x]`GET /api/staff` - List with search/filter
+  - [x]`POST /api/staff` - Create staff
+  - [x]`GET /api/staff/:id` - Get details with certifications and background checks
+  - [x]`PUT /api/staff/:id` - Update staff
+- [x]Backend: Staff certifications routes
+- [x]Backend: Background checks routes
+- [x]Frontend: Port staff components
+  - [x]`StaffListPage.tsx` - Replace IPC with API calls
+  - [x]`StaffEnrollmentForm.tsx` - Replace IPC with API calls
+  - [x]`StaffDetailPage.tsx` - Replace IPC with API calls
 
 ### 6.3 Deliverables
 
@@ -243,25 +240,25 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 7.1 Tasks
 
-- [ ] Backend: Attendance API routes
-  - [ ] `GET /api/attendance/today/children` - Today's child attendance status
-  - [ ] `GET /api/attendance/today/staff` - Today's staff attendance status
-  - [ ] `POST /api/attendance/children/checkin` - Check in child
-  - [ ] `POST /api/attendance/children/:id/checkout` - Check out child
-  - [ ] `POST /api/attendance/staff/clockin` - Clock in staff
-  - [ ] `POST /api/attendance/staff/:id/clockout` - Clock out staff
-  - [ ] `GET /api/attendance/points` - Get point system status
-  - [ ] `GET /api/attendance/history` - Historical records with filters
-  - [ ] `PUT /api/attendance/:id/correct` - Time correction
-- [ ] Backend: Port Virginia Point System service
-  - [ ] Age calculation from date of birth
-  - [ ] Point assignment by age group
-  - [ ] Caregiver requirement calculation
-  - [ ] Compliance status determination
-- [ ] Frontend: Port attendance components
-  - [ ] `AttendancePage.tsx` - Replace IPC with API calls, keep touch-friendly UI
-  - [ ] `AttendanceHistory.tsx` - Replace IPC with API calls
-  - [ ] Ensure responsive layout for tablet use
+- [x]Backend: Attendance API routes
+  - [x]`GET /api/attendance/today/children` - Today's child attendance status
+  - [x]`GET /api/attendance/today/staff` - Today's staff attendance status
+  - [x]`POST /api/attendance/children/checkin` - Check in child
+  - [x]`POST /api/attendance/children/:id/checkout` - Check out child
+  - [x]`POST /api/attendance/staff/clockin` - Clock in staff
+  - [x]`POST /api/attendance/staff/:id/clockout` - Clock out staff
+  - [x]`GET /api/attendance/points` - Get point system status
+  - [x]`GET /api/attendance/history` - Historical records with filters
+  - [x]`PUT /api/attendance/:id/correct` - Time correction
+- [x]Backend: Port Virginia Point System service
+  - [x]Age calculation from date of birth
+  - [x]Point assignment by age group
+  - [x]Caregiver requirement calculation
+  - [x]Compliance status determination
+- [x]Frontend: Port attendance components
+  - [x]`AttendancePage.tsx` - Replace IPC with API calls, keep touch-friendly UI
+  - [x]`AttendanceHistory.tsx` - Replace IPC with API calls
+  - [x]Ensure responsive layout for tablet use
 
 ### 7.2 Deliverables
 
@@ -277,33 +274,33 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 8.1 Tasks
 
-- [ ] Backend: Fee configuration routes
-  - [ ] CRUD for fee configurations
-- [ ] Backend: Invoice routes
-  - [ ] `POST /api/billing/invoices/generate` - Generate invoices for period
-  - [ ] `GET /api/billing/invoices` - List invoices with status filter
-  - [ ] `GET /api/billing/invoices/:id` - Full invoice detail with line items and payments
-  - [ ] `PUT /api/billing/invoices/:id/void` - Void invoice
-  - [ ] `POST /api/billing/invoices/:id/line-items` - Add line item
-  - [ ] `PUT /api/billing/invoices/:id/line-items/:itemId` - Update line item
-  - [ ] `DELETE /api/billing/invoices/:id/line-items/:itemId` - Delete line item
-  - [ ] `PUT /api/billing/invoices/:id/split-billing` - Update split billing
-- [ ] Backend: Payment routes
-  - [ ] `POST /api/billing/payments` - Record payment
-  - [ ] `GET /api/billing/payments` - List payments
-- [ ] Backend: Family account routes
-  - [ ] `GET /api/billing/families` - List family accounts
-  - [ ] `GET /api/billing/families/:id` - Family account detail
-- [ ] Backend: Billing summary and aging report routes
-- [ ] Frontend: Port billing components
-  - [ ] `BillingDashboard.tsx` - Replace IPC with API calls
-  - [ ] `FeeConfigPage.tsx` - Replace IPC with API calls
-  - [ ] `InvoiceListPage.tsx` - Replace IPC with API calls
-  - [ ] `InvoiceDetailPage.tsx` - Replace IPC with API calls (including split billing)
-  - [ ] `PaymentRecordForm.tsx` - Replace IPC with API calls
-  - [ ] `FamilyAccountPage.tsx` - Replace IPC with API calls
-  - [ ] `AgingReport.tsx` - Replace IPC with API calls
-  - [ ] `PrintableInvoice.tsx` - No changes needed (browser print)
+- [x]Backend: Fee configuration routes
+  - [x]CRUD for fee configurations
+- [x]Backend: Invoice routes
+  - [x]`POST /api/billing/invoices/generate` - Generate invoices for period
+  - [x]`GET /api/billing/invoices` - List invoices with status filter
+  - [x]`GET /api/billing/invoices/:id` - Full invoice detail with line items and payments
+  - [x]`PUT /api/billing/invoices/:id/void` - Void invoice
+  - [x]`POST /api/billing/invoices/:id/line-items` - Add line item
+  - [x]`PUT /api/billing/invoices/:id/line-items/:itemId` - Update line item
+  - [x]`DELETE /api/billing/invoices/:id/line-items/:itemId` - Delete line item
+  - [x]`PUT /api/billing/invoices/:id/split-billing` - Update split billing
+- [x]Backend: Payment routes
+  - [x]`POST /api/billing/payments` - Record payment
+  - [x]`GET /api/billing/payments` - List payments
+- [x]Backend: Family account routes
+  - [x]`GET /api/billing/families` - List family accounts
+  - [x]`GET /api/billing/families/:id` - Family account detail
+- [x]Backend: Billing summary and aging report routes
+- [x]Frontend: Port billing components
+  - [x]`BillingDashboard.tsx` - Replace IPC with API calls
+  - [x]`FeeConfigPage.tsx` - Replace IPC with API calls
+  - [x]`InvoiceListPage.tsx` - Replace IPC with API calls
+  - [x]`InvoiceDetailPage.tsx` - Replace IPC with API calls (including split billing)
+  - [x]`PaymentRecordForm.tsx` - Replace IPC with API calls
+  - [x]`FamilyAccountPage.tsx` - Replace IPC with API calls
+  - [x]`AgingReport.tsx` - Replace IPC with API calls
+  - [x]`PrintableInvoice.tsx` - No changes needed (browser print)
 
 ### 8.2 Deliverables
 
@@ -320,23 +317,23 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 9.1 Tasks
 
-- [ ] Backend: Dashboard route
-  - [ ] `GET /api/reports/dashboard` - Aggregated dashboard data
-  - [ ] Checked-in children count and list
-  - [ ] Clocked-in staff count and list
-  - [ ] Point system status
-  - [ ] Past due accounts
-  - [ ] Certification expiration alerts
-  - [ ] Licensed capacity info
-- [ ] Backend: Report routes
-  - [ ] `GET /api/reports/attendance` - Attendance report with filters
-  - [ ] `GET /api/reports/financial` - Financial report with filters
-  - [ ] `GET /api/reports/export/csv` - Server-side CSV generation, return as download
-  - [ ] `GET /api/reports/export/pdf` - Server-side PDF generation, return as download
-- [ ] Frontend: Port dashboard and report components
-  - [ ] `DashboardPage.tsx` - Replace IPC with API calls
-  - [ ] `ReportsPage.tsx` - Replace IPC with API calls
-  - [ ] Update CSV/PDF export to trigger file download from API
+- [x]Backend: Dashboard route
+  - [x]`GET /api/reports/dashboard` - Aggregated dashboard data
+  - [x]Checked-in children count and list
+  - [x]Clocked-in staff count and list
+  - [x]Point system status
+  - [x]Past due accounts
+  - [x]Certification expiration alerts
+  - [x]Licensed capacity info
+- [x]Backend: Report routes
+  - [x]`GET /api/reports/attendance` - Attendance report with filters
+  - [x]`GET /api/reports/financial` - Financial report with filters
+  - [x]`GET /api/reports/export/csv` - Server-side CSV generation, return as download
+  - [x]`GET /api/reports/export/pdf` - Server-side PDF generation, return as download
+- [x]Frontend: Port dashboard and report components
+  - [x]`DashboardPage.tsx` - Replace IPC with API calls
+  - [x]`ReportsPage.tsx` - Replace IPC with API calls
+  - [x]Update CSV/PDF export to trigger file download from API
 
 ### 9.2 Deliverables
 
@@ -351,35 +348,35 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 10.1 Tasks
 
-- [ ] Backend: Settings routes
-  - [ ] `GET /api/settings` - Get all settings
-  - [ ] `PUT /api/settings` - Update settings
-  - [ ] `GET /api/settings/facility` - Get facility info
-  - [ ] `PUT /api/settings/facility` - Update facility info
-  - [ ] `GET /api/settings/branding` - Get app branding
-- [ ] Backend: Role permissions routes
-  - [ ] `GET /api/settings/permissions/:role` - Get role permissions
-  - [ ] `PUT /api/settings/permissions/:role` - Update role permission
-- [ ] Backend: Backup/Restore routes
-  - [ ] `POST /api/settings/backup/data` - Create database backup
-  - [ ] `POST /api/settings/backup/app` - Create full application backup
-  - [ ] `POST /api/settings/restore` - Restore from uploaded backup file
-  - [ ] `GET /api/settings/backup/history` - List backup history
-  - [ ] `GET /api/settings/backup/:id/download` - Download backup file
-  - [ ] `DELETE /api/settings/backup/:id` - Delete backup
-- [ ] Backend: Letterhead image upload
-  - [ ] `POST /api/settings/letterhead` - Upload letterhead image (multipart/form-data)
-  - [ ] `GET /api/settings/letterhead` - Get letterhead data URL
-- [ ] Backend: Data retention routes
-  - [ ] Archive records
-  - [ ] Get archived records
-  - [ ] Process expired archives
-  - [ ] Export data as CSV
-- [ ] Frontend: Port settings components
-  - [ ] `SettingsPage.tsx` - Replace IPC with API calls for all tabs
-  - [ ] File upload for letterhead (HTML file input instead of Electron dialog)
-  - [ ] Backup download via browser download (instead of Electron Save dialog)
-  - [ ] Backup restore via file upload (instead of Electron Open dialog)
+- [x]Backend: Settings routes
+  - [x]`GET /api/settings` - Get all settings
+  - [x]`PUT /api/settings` - Update settings
+  - [x]`GET /api/settings/facility` - Get facility info
+  - [x]`PUT /api/settings/facility` - Update facility info
+  - [x]`GET /api/settings/branding` - Get app branding
+- [x]Backend: Role permissions routes
+  - [x]`GET /api/settings/permissions/:role` - Get role permissions
+  - [x]`PUT /api/settings/permissions/:role` - Update role permission
+- [x]Backend: Backup/Restore routes
+  - [x]`POST /api/settings/backup/data` - Create database backup
+  - [x]`POST /api/settings/backup/app` - Create full application backup
+  - [x]`POST /api/settings/restore` - Restore from uploaded backup file
+  - [x]`GET /api/settings/backup/history` - List backup history
+  - [x]`GET /api/settings/backup/:id/download` - Download backup file
+  - [x]`DELETE /api/settings/backup/:id` - Delete backup
+- [x]Backend: Letterhead image upload
+  - [x]`POST /api/settings/letterhead` - Upload letterhead image (multipart/form-data)
+  - [x]`GET /api/settings/letterhead` - Get letterhead data URL
+- [x]Backend: Data retention routes
+  - [x]Archive records
+  - [x]Get archived records
+  - [x]Process expired archives
+  - [x]Export data as CSV
+- [x]Frontend: Port settings components
+  - [x]`SettingsPage.tsx` - Replace IPC with API calls for all tabs
+  - [x]File upload for letterhead (HTML file input instead of Electron dialog)
+  - [x]Backup download via browser download (instead of Electron Save dialog)
+  - [x]Backup restore via file upload (instead of Electron Open dialog)
 
 ### 10.2 Deliverables
 
@@ -390,43 +387,32 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ---
 
-## 11. Phase 8: Docker & TrueNAS Deployment
+## 11. Phase 8: TrueNAS Deployment
 
 ### 11.1 Tasks
 
-- [ ] Finalize Dockerfile
-  - [ ] Multi-stage build (build frontend, package with backend)
-  - [ ] Minimal production image (node:20-alpine)
-  - [ ] Expose port 3000
-- [ ] Finalize docker-compose.yml
-  - [ ] App container with environment variables
-  - [ ] PostgreSQL container with persistent volume
-  - [ ] Network configuration
-  - [ ] Auto-restart policies
-  - [ ] Health checks
-- [ ] Configure TrueNAS deployment
-  - [ ] Document steps for TrueNAS Scale (native Docker/Kubernetes)
-  - [ ] Document steps for TrueNAS Core (via VM with Docker)
-  - [ ] Configure TrueNAS dataset for data persistence
-  - [ ] Set up automated daily backups via cron/scheduled task
-- [ ] Configure networking
-  - [ ] Static IP or hostname for the TrueNAS server
-  - [ ] Port forwarding if needed
-  - [ ] Optional: mDNS/Bonjour for `daycare.local` access
-- [ ] Test deployment
-  - [ ] Test from desktop browser
-  - [ ] Test from tablet browser
-  - [ ] Test from phone browser
-  - [ ] Test container restart (data persists)
-  - [ ] Test database backup and restore
+- [x] Create Ubuntu Server 24.04 VM on TrueNAS Core
+  - [x] UEFI boot, 1 CPU, 2GB RAM, 10GB disk
+  - [x] Static IP: 10.0.0.70 on igc1 (bridged)
+  - [x] VM auto-start enabled
+- [x] Install Node.js 20, Git on VM
+- [x] Clone repository from GitHub
+- [x] Build client, run migrations and seed
+- [x] Create systemd service (daycare.service)
+  - [x] Auto-start on boot
+  - [x] Restart on failure
+- [x] Test access from desktop, tablet, phone
+- [x] Set up PWA with home screen icons
+- [x] Docker config available as alternative (Dockerfile + docker-compose.yml)
 
 ### 11.2 Deliverables
 
-- Docker image builds successfully
-- docker-compose up starts the entire stack
-- Application accessible from all devices on local network
-- Data persists across container restarts
-- Deployment documentation for TrueNAS
+- ✅ App running on VM at http://10.0.0.70:3001
+- ✅ Auto-start chain: TrueNAS → VM → systemd → app
+- ✅ Accessible from desktop, tablet, phone
+- ✅ PWA home screen support with branded icons
+- ✅ Data persists across restarts
+- ✅ Deployment guide documented
 
 ---
 
@@ -434,38 +420,38 @@ A "session" is one working period with Claude doing the development. Each sessio
 
 ### 12.1 Tasks
 
-- [ ] Functional testing
-  - [ ] Test all CRUD operations for each module
-  - [ ] Test attendance check-in/check-out from tablet
-  - [ ] Test billing workflow end-to-end
-  - [ ] Test multi-user scenarios (staff on tablet + admin on desktop simultaneously)
-  - [ ] Test all reports and exports
-  - [ ] Test backup and restore
-- [ ] Responsive design testing
-  - [ ] Desktop (1920x1080, 1366x768)
-  - [ ] Tablet (1024x768, 768x1024)
-  - [ ] Phone (390x844, 412x915)
-  - [ ] Test touch interactions on tablet/phone
-- [ ] Cross-browser testing
-  - [ ] Chrome (primary)
-  - [ ] Firefox
-  - [ ] Safari (iOS)
-  - [ ] Edge
-- [ ] Security testing
-  - [ ] Verify unauthenticated API access is blocked
-  - [ ] Verify permission-based access control on API
-  - [ ] Verify session expiry works
-  - [ ] Test with invalid/malicious input
-- [ ] Performance testing
-  - [ ] Dashboard load time
-  - [ ] Attendance page refresh performance
-  - [ ] API response times under normal load
-- [ ] Polish
-  - [ ] Consistent error handling and messages
-  - [ ] Loading states for all API calls
-  - [ ] Empty states for lists with no data
-  - [ ] Verify all i18n strings are present in all languages
-  - [ ] Verify all themes work correctly
+- [x]Functional testing
+  - [x]Test all CRUD operations for each module
+  - [x]Test attendance check-in/check-out from tablet
+  - [x]Test billing workflow end-to-end
+  - [x]Test multi-user scenarios (staff on tablet + admin on desktop simultaneously)
+  - [x]Test all reports and exports
+  - [x]Test backup and restore
+- [x]Responsive design testing
+  - [x]Desktop (1920x1080, 1366x768)
+  - [x]Tablet (1024x768, 768x1024)
+  - [x]Phone (390x844, 412x915)
+  - [x]Test touch interactions on tablet/phone
+- [x]Cross-browser testing
+  - [x]Chrome (primary)
+  - [x]Firefox
+  - [x]Safari (iOS)
+  - [x]Edge
+- [x]Security testing
+  - [x]Verify unauthenticated API access is blocked
+  - [x]Verify permission-based access control on API
+  - [x]Verify session expiry works
+  - [x]Test with invalid/malicious input
+- [x]Performance testing
+  - [x]Dashboard load time
+  - [x]Attendance page refresh performance
+  - [x]API response times under normal load
+- [x]Polish
+  - [x]Consistent error handling and messages
+  - [x]Loading states for all API calls
+  - [x]Empty states for lists with no data
+  - [x]Verify all i18n strings are present in all languages
+  - [x]Verify all themes work correctly
 
 ### 12.2 Deliverables
 
@@ -517,8 +503,8 @@ These files need the IPC calls replaced with fetch/axios API calls:
 | `server/middleware/auth.ts` | Session authentication middleware |
 | `server/middleware/permissions.ts` | Role-based permission middleware |
 | `server/services/*.ts` | Port business logic from HDMA services |
-| `server/db/connection.ts` | PostgreSQL connection via Drizzle |
-| `server/db/schema.ts` | Adapted schema for PostgreSQL |
+| `server/db/connection.ts` | SQLite connection via better-sqlite3 |
+| `server/db/migrate.ts` | Raw SQL CREATE TABLE statements |
 | `client/src/lib/api.ts` | API client utility (replaces `window.api`) |
 | `Dockerfile` | Multi-stage Docker build |
 | `docker-compose.yml` | App + PostgreSQL composition |
@@ -578,8 +564,8 @@ const result = await api.children.getAll({ status: 'active' });
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| TrueNAS Core lacks native Docker | High | Use a Debian/Ubuntu VM on TrueNAS Core with Docker installed. Document setup steps. |
-| PostgreSQL migration issues | Medium | Drizzle ORM handles most type differences. Test schema migration thoroughly in Phase 1. |
+| TrueNAS Core lacks native Docker | High | **Resolved**: Used Ubuntu Server VM with systemd instead. Jail approach had VNET networking issues. |
+| Database migration | Low | **Resolved**: Kept SQLite (same as HDMA v1.0). No migration needed. |
 | Multi-user data conflicts | Medium | Use database transactions for critical operations. PostgreSQL handles concurrency well. |
 | Tablet browser compatibility | Low | MUI is well-tested on mobile browsers. Test on actual tablet during Phase 9. |
 | Network connectivity | Low | App runs on local network. TrueNAS server is always on. No internet dependency. |
@@ -659,10 +645,10 @@ daycare-management-system/
 ├── server/                           # Backend (Express)
 │   ├── src/
 │   │   ├── db/
-│   │   │   ├── connection.ts         # NEW - PostgreSQL connection
-│   │   │   ├── schema.ts            # Adapt from HDMA (PostgreSQL types)
-│   │   │   ├── migrations/          # Drizzle migrations
-│   │   │   └── seed.ts              # Adapt from HDMA
+│   │   │   ├── connection.ts         # NEW - SQLite connection (better-sqlite3)
+│   │   │   ├── schema.ts            # Drizzle schema (reference only, not used for queries)
+│   │   │   ├── migrate.ts           # Raw SQL CREATE TABLE migrations
+│   │   │   └── seed.ts              # Seed data script
 │   │   ├── middleware/
 │   │   │   ├── auth.ts              # NEW - Session auth middleware
 │   │   │   ├── permissions.ts       # NEW - RBAC middleware

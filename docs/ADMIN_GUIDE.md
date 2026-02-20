@@ -34,10 +34,10 @@
 ### 1.1 System Requirements
 
 **Server (TrueNAS):**
-- TrueNAS Scale (preferred, native Docker) or TrueNAS Core (Docker via VM)
-- 2 GB RAM minimum allocated to Docker
-- 5 GB disk space for application and database
-- Static IP address on local network (recommended)
+- TrueNAS Core with Ubuntu Server VM (current setup) or TrueNAS Scale with Docker
+- 1-2 GB RAM minimum for VM
+- 10 GB disk space for VM (5 GB for application and database)
+- Static IP address on local network (current: 10.0.0.70)
 
 **Client Devices (any of the following):**
 - Desktop/Laptop with any modern browser (Chrome, Firefox, Edge, Safari)
@@ -50,10 +50,10 @@
 Once deployed, access the application from any device on your local network:
 
 ```
-http://<truenas-ip>:3000
+http://<truenas-ip>:3001
 ```
 
-For example: `http://192.168.1.100:3000`
+For example: `http://192.168.1.100:3001`
 
 Bookmark this URL on all devices that will use the application.
 
@@ -69,51 +69,41 @@ If using seed data for initial setup:
 
 ## 2. TrueNAS Deployment
 
-### 2.1 TrueNAS Scale (Recommended)
+### 2.1 Current Setup (TrueNAS Core VM)
 
-TrueNAS Scale has native Docker/Kubernetes support:
+The application is deployed on a **TrueNAS Core VM** running Ubuntu Server 24.04:
 
-1. Log into TrueNAS Scale web interface
-2. Navigate to **Apps** section
-3. Deploy using Docker Compose:
-   - Upload or create the `docker-compose.yml` provided with the application
-   - Configure the data volume to point to a TrueNAS dataset
-   - Set environment variables (database password, session secret)
-4. Start the application
-5. Verify by navigating to `http://<truenas-ip>:3000`
+| Item | Value |
+|------|-------|
+| VM OS | Ubuntu Server 24.04 LTS (minimized) |
+| VM IP | 10.0.0.70 (static) |
+| App Path | /home/ikhan/daycare |
+| Database | /home/ikhan/daycare/data/daycare.db (SQLite) |
+| Service | systemd daycare.service |
+| App URL | http://10.0.0.70:3001 |
+| GitHub | https://github.com/ikhan7548/DMS.git |
 
-### 2.2 TrueNAS Core (Via VM)
+**Auto-start chain**: TrueNAS boots → VM auto-starts → systemd starts daycare.service → app accessible.
 
-TrueNAS Core doesn't support Docker natively. Use a VM:
+### 2.2 Updating the App
 
-1. Create a new VM in TrueNAS (Debian or Ubuntu recommended)
-2. Install Docker and Docker Compose inside the VM
-3. Copy the application files to the VM
-4. Run `docker-compose up -d`
-5. Configure VM networking to be accessible on the local network
-6. Verify by navigating to `http://<vm-ip>:3000`
+SSH into the VM and run:
+```bash
+cd ~/daycare && git pull && cd client && npx vite build && cd .. && sudo systemctl restart daycare
+```
 
 ### 2.3 Data Persistence
 
-The application stores data in Docker volumes:
+| Location | Contents |
+|----------|----------|
+| `data/daycare.db` | SQLite database (all application data) |
+| `backups/` | Backup files (data and full backups) |
 
-| Volume | Contents | Persistence |
-|--------|----------|-------------|
-| `db-data` | PostgreSQL database files | Survives container restarts |
-| `dms-data` | Backups, uploaded files | Survives container restarts |
+Data persists on the VM's disk (TrueNAS zvol). For additional protection, configure TrueNAS snapshots of the zvol.
 
-**Map these volumes to TrueNAS datasets** for additional protection via TrueNAS snapshots and replication.
+### 2.4 Docker Alternative
 
-### 2.4 Environment Variables
-
-Configure these in your `docker-compose.yml` or `.env` file:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://dms:securepass@db:5432/daycare` |
-| `SESSION_SECRET` | Random string for session encryption | `a1b2c3d4e5f6...` (32+ characters) |
-| `PORT` | HTTP port | `3000` |
-| `BACKUP_DIR` | Backup file storage path | `/app/data/backups` |
+For TrueNAS Scale or other Docker-capable systems, the project includes `Dockerfile` and `docker-compose.yml`. See `docs/DEPLOYMENT_GUIDE.md` for full instructions.
 
 ---
 
@@ -122,7 +112,7 @@ Configure these in your `docker-compose.yml` or `.env` file:
 After deployment, complete these steps in order:
 
 ### Step 1: Log In
-Open `http://<truenas-ip>:3000` in your browser and log in with the default admin credentials.
+Open `http://<truenas-ip>:3001` in your browser and log in with the default admin credentials.
 
 ### Step 2: Change Default PIN
 Navigate to **Settings > Users**, find the admin account, and reset the PIN to something secure.
@@ -419,13 +409,18 @@ Navigate to **Settings > Backup**:
 
 View all backups with: Date, Type, Filename, Size. Actions: Download, Restore, Delete.
 
-### 11.5 Automated Backups
+### 11.5 Auto-Backup Scheduler
 
-The server automatically creates daily database backups. These are stored in the backup directory on the TrueNAS volume.
+Navigate to **Settings > Backup** and configure the auto-backup scheduler:
+- **Enable/Disable**: Toggle automatic backups on/off
+- **Interval**: Hourly, Every 6 hours, Every 12 hours, or Daily
+- **Backup Type**: Data (database only) or Full (zip archive)
+- **Run Now**: Trigger an immediate backup
+- Shows last backup time and next scheduled time
 
 ### 11.6 TrueNAS Snapshots
 
-For additional protection, configure TrueNAS to take periodic snapshots of the datasets used by the Docker volumes. This provides filesystem-level recovery independent of the application.
+For additional protection, configure TrueNAS to take periodic snapshots of the zvol used by the VM. This provides filesystem-level recovery independent of the application.
 
 ---
 
@@ -466,19 +461,36 @@ Changes apply immediately to all interface text.
 
 ## 14. Reports & Exports
 
-### 14.1 Attendance Reports
+The Reports page has **4 tabs**:
 
-Navigate to **Reports > Attendance Reports**:
+### 14.1 Overview Tab (Attendance)
+
 - Filter by date range, type (All/Children/Staff), specific person
+- Results table with totals
 - Export as CSV or PDF
 
-### 14.2 Financial Reports
+### 14.2 Child Detail Tab
 
-Navigate to **Reports > Financial Reports**:
-- Filter by date range and family
-- Shows: Total Revenue, Total Payments, Total Outstanding
+- Select individual child, set date range
+- Attendance summary: Total days, total hours, average hours/day
+- Detailed daily table with CSV export
 
-### 14.3 Aging Report
+### 14.3 Staff Detail Tab
+
+- Select individual staff member, set date range
+- Hours summary: Total, regular, overtime
+- Detailed daily table with CSV export
+
+### 14.4 Financial Tab
+
+- Date range filter
+- Clickable summary cards: Total Billed, Total Collected, Total Outstanding
+- Click any card to drill down into filtered invoice/payment list
+- Monthly revenue trend
+- Staff payroll summary table (hours, rates, estimated pay)
+- CSV export
+
+### 14.5 Aging Report
 
 Navigate to **Billing > Aging Report**:
 - Groups past-due accounts: Current, 1-7, 8-14, 15-30, 30+ days
@@ -501,8 +513,8 @@ The web application is accessible from any device on your local network. Recomme
 
 1. Connect the tablet to the same Wi-Fi network as the TrueNAS server
 2. Open the browser (Chrome recommended)
-3. Navigate to `http://<truenas-ip>:3000`
-4. Bookmark the URL or add it to the home screen:
+3. Navigate to `http://10.0.0.70:3001`
+4. Add to home screen for app-like access with the Ducklings Daycare icon:
    - **Android**: Tap browser menu > "Add to Home Screen"
    - **iPad**: Tap Share icon > "Add to Home Screen"
 5. Log in with the staff user account
@@ -511,7 +523,7 @@ The web application is accessible from any device on your local network. Recomme
 ### 15.3 Setting Up a Phone
 
 1. Connect to the same Wi-Fi network
-2. Open browser and navigate to `http://<truenas-ip>:3000`
+2. Open browser and navigate to `http://<truenas-ip>:3001`
 3. Add to home screen for app-like access
 4. The interface adapts to the phone screen size
 
@@ -540,25 +552,30 @@ Each user has their own independent session.
 To update to a new version:
 
 ```bash
-# On the TrueNAS server (or VM)
-cd /path/to/daycare-management-system
-docker-compose pull
-docker-compose up -d
+# SSH into VM
+ssh ikhan@10.0.0.70
+
+# Pull latest code, rebuild, and restart
+cd ~/daycare && git pull && cd client && npx vite build && cd .. && sudo systemctl restart daycare
 ```
 
-This downloads the latest image and restarts the containers. Data is preserved in the Docker volumes.
+If dependencies changed (new npm packages), also run:
+```bash
+cd ~/daycare/server && npm install && cd ../client && npm install && cd ..
+```
 
 ### 16.2 Monitoring
 
-- Check container status: `docker-compose ps`
-- View logs: `docker-compose logs -f`
-- Check disk usage: Monitor TrueNAS storage dashboard
+- Check service status: `sudo systemctl status daycare`
+- View live logs: `sudo journalctl -u daycare -f`
+- Check disk usage: `df -h` on VM, or TrueNAS storage dashboard
 
 ### 16.3 Database Maintenance
 
-PostgreSQL handles maintenance automatically. For manual maintenance:
-- Backups: Use the in-app backup system or `pg_dump`
-- Vacuum: PostgreSQL auto-vacuums by default
+SQLite requires minimal maintenance:
+- Backups: Use the in-app backup system (Settings > Backup)
+- The database uses WAL mode for concurrent access
+- No vacuum or maintenance tasks needed for normal use
 
 ---
 
@@ -568,19 +585,19 @@ PostgreSQL handles maintenance automatically. For manual maintenance:
 
 **Check**:
 1. Is the TrueNAS server running? Check TrueNAS web UI
-2. Is the Docker container running? `docker-compose ps`
-3. Is the device on the same network? Check Wi-Fi connection
-4. Is the URL correct? `http://<truenas-ip>:3000`
-5. Try the IP address directly (not hostname)
-6. Check if a firewall is blocking port 3000
+2. Is the VM running? Check TrueNAS > Virtual Machines
+3. Is the service running? SSH in: `sudo systemctl status daycare`
+4. Is the device on the same network? Check Wi-Fi connection
+5. Is the URL correct? `http://10.0.0.70:3001`
+6. Test from inside VM: `curl http://localhost:3001/api/health`
 
 ### 17.2 Application Loads But Shows Error
 
-**Check container logs**: `docker-compose logs dms-app`
+**Check service logs**: `sudo journalctl -u daycare --since "10 minutes ago"`
 
 Common issues:
-- Database connection failed: Check `DATABASE_URL` environment variable
-- Port conflict: Another service using port 3000
+- Database file missing: Run `npx tsx server/src/db/migrate.ts`
+- Port conflict: Another service using port 3001
 
 ### 17.3 Login Issues
 
@@ -590,29 +607,31 @@ Common issues:
 
 ### 17.4 Slow Performance
 
-- Check TrueNAS server resource usage (CPU, RAM)
-- Ensure Docker has sufficient RAM allocated (2 GB minimum)
+- Check VM resource usage: `free -m` (memory), `top` (CPU)
+- Check TrueNAS server resource usage
 - Check network connection quality (Wi-Fi signal)
 
 ### 17.5 Data Recovery
 
 If something goes wrong:
 1. **In-app restore**: Settings > Backup > Restore from History
-2. **Docker volume**: Data persists in Docker volumes even if containers are recreated
-3. **TrueNAS snapshots**: If configured, restore from TrueNAS snapshot
+2. **Manual DB copy**: Database file at `~/daycare/data/daycare.db`
+3. **TrueNAS snapshots**: If configured, restore from TrueNAS zvol snapshot
 
-### 17.6 Container Won't Start
+### 17.6 Service Won't Start
 
 ```bash
 # Check logs
-docker-compose logs
+sudo journalctl -u daycare -f
 
-# Restart containers
-docker-compose restart
+# Restart service
+sudo systemctl restart daycare
 
-# Full rebuild
-docker-compose down
-docker-compose up -d --build
+# Check if Node.js is available
+which node && node --version
+
+# Re-run migrations if DB is missing
+cd ~/daycare && npx tsx server/src/db/migrate.ts
 ```
 
 ### 17.7 Tablet Touch Issues
@@ -630,23 +649,28 @@ docker-compose up -d --build
 
 | URL | Purpose |
 |-----|---------|
-| `http://<truenas-ip>:3000` | Application |
-| `http://<truenas-ip>` | TrueNAS web interface |
+| `http://10.0.0.70:3001` | Daycare Management System |
+| TrueNAS Web UI | TrueNAS administration |
 
-### Docker Commands
+### VM Management Commands
 
 | Command | Purpose |
 |---------|---------|
-| `docker-compose up -d` | Start application |
-| `docker-compose down` | Stop application |
-| `docker-compose restart` | Restart application |
-| `docker-compose logs -f` | View live logs |
-| `docker-compose ps` | Check status |
-| `docker-compose pull` | Download updates |
+| `sudo systemctl status daycare` | Check app status |
+| `sudo systemctl restart daycare` | Restart app |
+| `sudo systemctl stop daycare` | Stop app |
+| `sudo journalctl -u daycare -f` | View live logs |
+| `cd ~/daycare && git pull` | Pull latest code |
+| `cd client && npx vite build` | Rebuild frontend |
 
-### Default Ports
+### Update Command (All-in-One)
+
+```bash
+cd ~/daycare && git pull && cd client && npx vite build && cd .. && sudo systemctl restart daycare
+```
+
+### Default Port
 
 | Service | Port |
 |---------|------|
-| Web Application | 3000 |
-| PostgreSQL | 5432 (internal, not exposed) |
+| Web Application | 3001 |

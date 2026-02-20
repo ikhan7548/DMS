@@ -66,23 +66,25 @@ On **phone**: Tap the hamburger menu to slide the sidebar open.
 ### 2.1 From a Desktop or Laptop
 
 1. Open your web browser (Chrome, Firefox, Edge, or Safari)
-2. Type the application URL: `http://<server-ip>:3000` (your admin will provide the exact address)
+2. Type the application URL: `http://<server-ip>:3001` (your admin will provide the exact address)
 3. Bookmark the URL for easy access
 
 ### 2.2 From a Tablet
 
 1. Connect to the daycare Wi-Fi network
-2. Open the browser
-3. Navigate to the application URL
-4. Add to home screen for app-like access:
-   - **Android**: Menu > "Add to Home Screen"
-   - **iPad**: Share button > "Add to Home Screen"
+2. Open the browser (Chrome recommended)
+3. Navigate to the application URL: `http://10.0.0.70:3001`
+4. **Add to Home Screen** for app-like access with the Ducklings Daycare icon:
+   - **Android**: Tap browser menu (⋮) > "Add to Home Screen" > Tap "Add"
+   - **iPad**: Tap Share icon > "Add to Home Screen" > Tap "Add"
+5. The app icon will appear on your home screen — tap it to open the app
 
 ### 2.3 From a Phone
 
 1. Connect to the daycare Wi-Fi
-2. Open the browser and navigate to the URL
-3. Add to home screen for quick access
+2. Open Chrome and navigate to `http://10.0.0.70:3001`
+3. **Add to Home Screen** (same steps as tablet above)
+4. The Ducklings Daycare icon will appear on your home screen
 
 **Note**: All devices must be connected to the same local network as the server. The application does not require internet access.
 
@@ -370,45 +372,80 @@ Invoices include your letterhead and footer if configured in Settings.
 
 ## 9. Reports
 
-### 9.1 Attendance Reports
+The Reports page has **4 tabs**:
+
+### 9.1 Overview Tab (Attendance Summary)
 
 1. Navigate to **Reports**
-2. Set date range, type filter, and optional specific person
-3. Tap **Generate Report**
-4. View results table: Date, Name, Type, Check-in, Check-out, Hours
+2. Set date range, type filter (All/Children/Staff), and optional specific person
+3. View results table: Date, Name, Type, Check-in, Check-out, Hours
+4. **Export**: Tap **Export CSV** or **Export PDF** to download
 
-**Export**: Tap **Export CSV** or **Export PDF** to download the report.
+### 9.2 Child Detail Tab
 
-### 9.2 Financial Reports
+1. Tap the **Child Detail** tab
+2. Select a child from the dropdown
+3. Set date range
+4. View attendance summary (total days, total hours, average hours per day)
+5. Detailed daily attendance table below
+6. Export as CSV
 
-1. Navigate to **Reports > Financial Reports** tab
-2. Set date range and optional family filter
-3. Tap **Generate Report**
-4. See: Total Revenue, Total Payments, Total Outstanding
+### 9.3 Staff Detail Tab
+
+1. Tap the **Staff Detail** tab
+2. Select a staff member from the dropdown
+3. Set date range
+4. View hours summary (total hours, regular hours, overtime)
+5. Detailed daily time clock table below
+6. Export as CSV
+
+### 9.4 Financial Tab
+
+1. Tap the **Financial** tab
+2. Set date range
+3. View summary cards: **Total Billed**, **Total Collected**, **Total Outstanding**
+4. **Click any card** to see the detailed list (e.g., click "Collected" to see all payments)
+5. Monthly revenue trend table below
+6. **Staff Payroll** section at bottom: shows each staff member's hours, pay rate, and estimated pay
+7. Export as CSV
 
 ---
 
 ## 10. Settings
 
-### 10.1 Available Tabs
+### 10.1 Available Tabs (8)
 
 | Tab | Purpose | Who Can Access |
 |-----|---------|---------------|
-| Facility Info | Daycare name, address, branding | Admin/Provider |
-| Users | User accounts | Admin/Provider |
-| Billing & Invoices | Invoice configuration | Admin/Provider |
-| Role Permissions | Feature access by role | Admin/Provider |
-| Backup | Backup and restore | Admin/Provider |
-| Appearance | Color themes | Any user |
+| Facility Info | Daycare name, address, branding, facility details | Admin/Provider |
+| Users | User accounts, PIN reset, role assignment | Admin/Provider |
+| Billing & Invoices | Due date config, letterhead upload, footer, data retention | Admin/Provider |
+| Role Permissions | Feature access toggles per role (22 features) | Admin/Provider |
+| Backup & Restore | Data/full backup, restore, auto-backup scheduler | Admin/Provider |
+| Compliance | Incidents, medications, meals, drills, communication log | Admin/Provider |
+| Appearance | Color themes + dark mode toggle | Any user |
 | Language | Interface language | Any user |
 
 ### 10.2 Changing Theme
 
 Go to **Settings > Appearance**, tap a theme card. Applied immediately.
 
-### 10.3 Changing Language
+### 10.3 Dark Mode
+
+Toggle **Dark Mode** in the Appearance tab. All pages support dark mode with proper contrast.
+
+### 10.4 Changing Language
 
 Go to **Settings > Language**. Choose English, Spanish, or Urdu. Applied immediately.
+
+### 10.5 Auto-Backup
+
+Go to **Settings > Backup & Restore**:
+- Toggle auto-backup on/off
+- Set interval (hourly, every 6h, every 12h, daily)
+- View backup history
+- Download or delete old backups
+- Tap **Run Now** to trigger an immediate backup
 
 ---
 
@@ -515,7 +552,7 @@ A: Chrome (recommended), Firefox, Safari, and Edge. All modern browsers should w
 A: The app is responsive - it adapts its layout to fit your screen size. All the same features are available on every device.
 
 **Q: How do I know the address to type in?**
-A: Ask your administrator. It's typically something like `http://192.168.1.100:3000` where the numbers are your TrueNAS server's IP address.
+A: The current address is `http://10.0.0.70:3001`. Ask your administrator if this has changed.
 
 **Q: I added it to my home screen but it shows a blank page.**
 A: Make sure you're connected to the daycare Wi-Fi. If you're on cellular data, the app won't be reachable since it's on the local network only.

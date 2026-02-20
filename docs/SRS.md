@@ -37,8 +37,8 @@ The system manages the following core business domains:
 - **Staff Management** - Staff profiles, certifications, background checks, and training records
 - **Attendance Tracking** - Daily check-in/check-out for children and clock-in/clock-out for staff with Virginia Point System ratio compliance
 - **Billing & Invoicing** - Fee configuration, invoice generation, payment recording, split billing, and aging reports
-- **Reporting** - Attendance reports, financial reports, CSV and PDF export
-- **Administrative Settings** - Facility configuration, user management, role-based permissions, backup/restore, appearance customization, and internationalization
+- **Reporting** - Attendance reports (overview, child detail, staff detail), financial reports with drill-down, staff payroll, CSV export
+- **Administrative Settings** - Facility configuration, user management, role-based permissions, backup/restore with auto-scheduler, compliance tracking (incidents, medications, meals, drills), appearance with dark mode, and internationalization
 
 ### 1.3 Target Users & Devices
 
@@ -57,8 +57,8 @@ The system manages the following core business domains:
 | Multi-user | Single user at a time | Multiple simultaneous users |
 | Access | Must be at the computer | Any device on local network |
 | Hosting | Runs on user's PC | Self-hosted on TrueNAS server |
-| Database | SQLite (local file) | PostgreSQL or SQLite (server) |
-| Installation | Windows installer | Docker container on TrueNAS |
+| Database | SQLite (local file) | SQLite via better-sqlite3 (server) |
+| Installation | Windows installer | Ubuntu VM on TrueNAS (or Docker) |
 
 ### 1.5 Regulatory Context
 
@@ -75,7 +75,7 @@ The application is designed for compliance with Virginia Department of Social Se
 
 ### 2.1 Product Perspective
 
-DMS is a self-hosted web application deployed as a Docker container on the user's TrueNAS server. The server runs 24/7 on the local network, making the application accessible from any device (desktop, tablet, phone) via a web browser without requiring internet access.
+DMS is a self-hosted web application deployed on the user's TrueNAS server via an Ubuntu VM with a systemd service (or optionally via Docker). The server runs 24/7 on the local network, making the application accessible from any device (desktop, tablet, phone) via a web browser without requiring internet access.
 
 ### 2.2 Product Functions Summary
 
@@ -86,8 +86,8 @@ DMS is a self-hosted web application deployed as a Docker container on the user'
 | Staff | Enrollment, profiles, certifications, background checks, training logs |
 | Attendance | Child check-in/check-out, staff clock-in/clock-out, Virginia Point System, attendance history, time corrections |
 | Billing | Fee configurations, invoice generation/management, payment recording, split billing, family accounts, aging reports |
-| Reports | Attendance reports, financial reports, CSV export, PDF export |
-| Settings | Facility info, app branding, user management, billing configuration, role permissions, backup/restore, appearance themes, language |
+| Reports | Attendance overview, child detail, staff detail, financial drill-down, payroll, CSV/PDF export |
+| Settings | Facility info, app branding, user management, billing config, role permissions, backup/restore with auto-scheduler, compliance tracking, appearance/dark mode, language |
 
 ### 2.3 Technology Stack
 
@@ -96,15 +96,15 @@ DMS is a self-hosted web application deployed as a Docker container on the user'
 | Frontend | React 19, TypeScript, Material-UI (MUI) |
 | State Management | Zustand |
 | Routing | React Router v7 |
-| Backend | Node.js with Express.js (or Fastify) |
-| API Layer | RESTful API (or tRPC) |
-| Database | PostgreSQL (recommended) or SQLite |
-| ORM | Drizzle ORM |
+| Backend | Node.js with Express.js |
+| API Layer | RESTful API |
+| Database | SQLite via better-sqlite3 |
+| Database Access | Raw SQL queries (no ORM query builder) |
 | Authentication | Session-based with PIN + bcryptjs hashing |
 | Internationalization | i18next, react-i18next |
 | PDF Generation | jsPDF |
-| Containerization | Docker |
-| Hosting | TrueNAS (Docker/VM) |
+| Containerization | Docker (optional) |
+| Hosting | TrueNAS Core VM (Ubuntu Server 24.04) |
 | Build Tool | Vite |
 | Version Control | Git, GitHub |
 
@@ -116,24 +116,26 @@ DMS is a self-hosted web application deployed as a Docker container on the user'
 │                  (Local Network, 24/7)               │
 │                                                     │
 │  ┌───────────────────────────────────────────────┐  │
-│  │           Docker Container (DMS)              │  │
+│  │         Ubuntu Server VM (10.0.0.70)          │  │
+│  │         systemd: daycare.service              │  │
 │  │                                               │  │
 │  │  ┌─────────────┐    ┌──────────────────────┐  │  │
 │  │  │  Frontend    │    │  Backend (API)       │  │  │
 │  │  │  React SPA   │◄──►│  Node.js + Express   │  │  │
-│  │  │  (Vite build)│    │  REST API endpoints  │  │  │
+│  │  │  (Vite build)│    │  REST API on :3001   │  │  │
 │  │  └─────────────┘    └──────────┬───────────┘  │  │
 │  │                                │              │  │
 │  │                     ┌──────────▼───────────┐  │  │
-│  │                     │  PostgreSQL / SQLite  │  │  │
-│  │                     │  (Data persistence)   │  │  │
+│  │                     │  SQLite (better-      │  │  │
+│  │                     │  sqlite3) data/       │  │  │
+│  │                     │  daycare.db           │  │  │
 │  │                     └──────────────────────┘  │  │
 │  └───────────────────────────────────────────────┘  │
 │                                                     │
-│  Volume Mount: /data → TrueNAS dataset              │
-│  (Database, backups, uploads persist across restarts)│
+│  VM disk: TrueNAS zvol                              │
+│  (Database, backups persist across VM restarts)     │
 └───────────────┬─────────────────────────────────────┘
-                │ Local Network (e.g., 192.168.1.x:3000)
+                │ Local Network (e.g., 10.0.0.70:3001)
     ┌───────────┼───────────────┐
     │           │               │
 ┌───▼───┐  ┌───▼───┐    ┌──────▼──────┐
@@ -153,8 +155,8 @@ The application follows a standard client-server web architecture:
 
 - **Frontend (Client)**: React Single Page Application (SPA) served as static files
 - **Backend (Server)**: Node.js REST API handling business logic and database access
-- **Database**: PostgreSQL (or SQLite) for data persistence
-- **Container**: Docker for deployment on TrueNAS
+- **Database**: SQLite via better-sqlite3 for data persistence
+- **Deployment**: Ubuntu VM on TrueNAS with systemd (Docker optional)
 
 ### 3.2 API Design
 
@@ -173,17 +175,13 @@ The backend exposes RESTful API endpoints organized by module:
 
 ### 3.3 Database Configuration
 
-**PostgreSQL (Recommended):**
-- Runs as a separate Docker container or TrueNAS plugin
-- Connection via environment variables
-- Supports concurrent multi-user access natively
-- Better suited for web application workloads
-
-**SQLite (Alternative):**
-- Single file, simpler setup
-- Stored on TrueNAS dataset volume mount
+**SQLite via better-sqlite3:**
+- Single file database at `data/daycare.db`
 - WAL mode for concurrent read support
 - Pragmas: foreign_keys ON, busy_timeout 5000ms, cache_size 20MB, synchronous NORMAL
+- Raw SQL queries throughout (no ORM query builder)
+- 28 tables defined in `server/src/db/migrate.ts`
+- Migrations use `CREATE TABLE IF NOT EXISTS` (safe to re-run)
 
 ### 3.4 Frontend Architecture
 
@@ -551,23 +549,43 @@ Lists:
 - Shows invoice header, line items, totals, footer
 - Split billing generates separate invoices per payer
 
-### 4.7 Reports Module
+### 4.7 Reports Module (4 Tabs)
 
-#### FR-RPT-001: Attendance Reports
+#### FR-RPT-001: Overview Tab (Attendance Reports)
 - Date range filter (defaults to last 30 days)
 - Filter by type (All, Children, Staff) and specific entity
 - Results table: Date, Name, Type, Check-in, Check-out, Total Hours
 - Record count display
+- CSV and PDF export
 
-#### FR-RPT-002: Financial Reports
-- Date range and family filter
-- Summary: Total Revenue, Total Payments, Total Outstanding
+#### FR-RPT-002: Child Detail Tab
+- Select individual child from dropdown
+- Date range filter
+- Attendance summary: Total days, total hours, average hours per day
+- Detailed daily attendance table
+- CSV export
 
-#### FR-RPT-003: CSV Export
-- Exports report data to CSV file (server generates, browser downloads)
+#### FR-RPT-003: Staff Detail Tab
+- Select individual staff member from dropdown
+- Date range filter
+- Hours summary: Total hours, regular hours, overtime hours
+- Detailed daily time clock table
+- CSV export
 
-#### FR-RPT-004: PDF Export
-- Exports report data to formatted PDF with headers, tables, page numbers
+#### FR-RPT-004: Financial Tab
+- Date range filter
+- Summary cards (clickable for drill-down): Total Billed, Total Collected, Total Outstanding
+- Clicking a card shows filtered invoice/payment list
+- Monthly revenue trend table
+- Staff payroll summary: Hours, regular/overtime, hourly rate, estimated pay
+- CSV export for financial data and payroll
+
+#### FR-RPT-005: CSV Export
+- Server-side CSV generation for attendance, payroll, and financial data
+- Browser download
+
+#### FR-RPT-006: PDF Export
+- Exports attendance report data to formatted PDF
 
 ### 4.8 Settings Module
 
@@ -590,16 +608,24 @@ Lists:
 - Admin/Provider always have full access
 
 #### FR-SET-005: Backup & Restore
-- **Data Backup**: Database dump to file on server
-- **Application Backup**: Full backup as downloadable archive
+- **Data Backup**: Database file copy stored on server
+- **Application Backup**: Full zip archive (database + data) downloaded to browser
 - **Restore**: Upload backup file to restore
-- **Backup History**: List with download, restore, delete actions
-- **Automated Backups**: Scheduled daily backup (new for web version)
+- **Backup History**: List with download, delete actions
+- **Auto-Backup Scheduler**: Configurable interval (hourly, every 6/12 hours, daily), enable/disable, run-now button
 
-#### FR-SET-006: Appearance
+#### FR-SET-006: Compliance
+- **Incident Reports**: Log incidents per child with description, action taken, parent notification
+- **Medication Logs**: Track medication administration (child, medication, dosage, time, administered by)
+- **Meal Tracking**: Log meals (breakfast/lunch/snack) with food items and attending children
+- **Drill Logs**: Safety drill records (fire, tornado, etc.)
+- **Communication Log**: Parent communication records (notes, emails, SMS, phone)
+
+#### FR-SET-007: Appearance
 - Multiple color themes with instant application
+- Dark mode toggle
 
-#### FR-SET-007: Language
+#### FR-SET-008: Language
 - English, Spanish, Urdu
 
 ### 4.9 Navigation
@@ -633,9 +659,9 @@ Lists:
 
 ## 5. Data Model
 
-### 5.1 Database Tables (31 Tables)
+### 5.1 Database Tables (28 Tables)
 
-The data model is carried forward from HDMA v1.0 with the same 31 tables.
+The data model is carried forward from HDMA v1.0 with 28 tables. See `docs/DATABASE_SCHEMA.md` for complete column-level documentation.
 
 #### Core Entity Tables
 
@@ -759,27 +785,27 @@ fee_configurations ── children (rate_tier_id)
 
 - **NFR-REL-001**: TrueNAS server provides 24/7 availability
 - **NFR-REL-002**: Automated daily database backups
-- **NFR-REL-003**: Docker container auto-restarts on failure
+- **NFR-REL-003**: Systemd service auto-restarts on failure (Restart=always)
 - **NFR-REL-004**: Foreign key enforcement ensures data integrity
 - **NFR-REL-005**: Server-side validation prevents invalid data
 
 ### 6.4 Scalability
 
-- **NFR-SCALE-001**: PostgreSQL handles concurrent multi-user access
+- **NFR-SCALE-001**: SQLite WAL mode handles concurrent multi-user read access
 - **NFR-SCALE-002**: Stateless API design supports horizontal scaling if needed
 - **NFR-SCALE-003**: Static frontend assets served efficiently
 
 ### 6.5 Portability
 
-- **NFR-PORT-001**: Docker container runs on any TrueNAS system (Core or Scale)
+- **NFR-PORT-001**: Runs on TrueNAS Core VM, TrueNAS Scale Docker, or any Linux with Node.js 20
 - **NFR-PORT-002**: Accessible from any device with a modern web browser
 - **NFR-PORT-003**: Database backup is a standard dump file, easily transferable
 
 ### 6.6 Maintainability
 
 - **NFR-MAIN-001**: TypeScript provides type safety across frontend and backend
-- **NFR-MAIN-002**: Drizzle ORM manages database schema and migrations
-- **NFR-MAIN-003**: Docker-based deployment simplifies updates
+- **NFR-MAIN-002**: Raw SQL migrations in `server/src/db/migrate.ts` (CREATE TABLE IF NOT EXISTS)
+- **NFR-MAIN-003**: Git-based deployment with systemd service (Docker optional)
 - **NFR-MAIN-004**: Environment variables for all configuration
 - **NFR-MAIN-005**: i18n externalized strings for easy translation
 
@@ -861,51 +887,35 @@ fee_configurations ── children (rate_tier_id)
 | POST | `/api/settings/backup` | Create backup |
 | POST | `/api/settings/restore` | Restore from backup |
 
-### 8.2 Docker Configuration
+### 8.2 Docker Configuration (Optional)
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
 services:
-  dms-app:
+  daycare:
     build: .
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
-      - DATABASE_URL=postgresql://dms:password@db:5432/daycare
       - SESSION_SECRET=<random-secret>
       - NODE_ENV=production
+      - PORT=3001
     volumes:
-      - dms-data:/app/data
-    depends_on:
-      - db
+      - ./data:/app/data
     restart: unless-stopped
-
-  db:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=daycare
-      - POSTGRES_USER=dms
-      - POSTGRES_PASSWORD=<secure-password>
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-volumes:
-  dms-data:
-  db-data:
 ```
+
+Note: The primary deployment method is a TrueNAS Core VM with systemd. See `docs/DEPLOYMENT_GUIDE.md` for details.
 
 ### 8.3 Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `SESSION_SECRET` | Secret for session encryption | Required |
-| `PORT` | HTTP server port | `3000` |
-| `NODE_ENV` | Environment mode | `production` |
-| `BACKUP_DIR` | Directory for backup files | `/app/data/backups` |
-| `LOG_LEVEL` | Logging verbosity | `info` |
+| `PORT` | HTTP server port | `3001` |
+| `SESSION_SECRET` | Secret for session encryption | `daycare-management-secret-change-in-production` |
+| `DATA_DIR` | Data directory path | `/app/data` |
+| `CLIENT_URL` | Client URL (for CORS) | `http://localhost:5173` |
+| `NODE_ENV` | Environment mode | `development` |
 
 ---
 
@@ -923,9 +933,9 @@ The following changes are needed to convert the existing Electron app to a web a
 | File Dialogs | Electron dialog.showSaveDialog | Browser download / file input |
 | Session Storage | In-memory (main process) | Server-side sessions (express-session) |
 | Window Management | Electron BrowserWindow | Standard browser window |
-| Native Modules | better-sqlite3 (native) | pg (PostgreSQL driver, pure JS) |
-| Build/Package | electron-builder → NSIS installer | Docker image |
-| Auto-Update | Not implemented | Docker image pull |
+| Native Modules | better-sqlite3 (native) | better-sqlite3 (same) |
+| Build/Package | electron-builder → NSIS installer | Vite build + systemd service (or Docker) |
+| Auto-Update | Not implemented | git pull + rebuild + restart service |
 
 ### 9.2 Code Reuse Strategy
 
@@ -933,17 +943,17 @@ The following code can be directly reused:
 - **All React components** (pages, forms, lists, dialogs) - only API call layer changes
 - **Zustand stores** (auth, theme, branding, UI) - minimal changes
 - **i18n translations** (en.json, es.json, ur.json) - no changes
-- **Drizzle ORM schema** - same tables, adapt for PostgreSQL types
+- **Database schema** - same 28 tables, kept as SQLite
 - **Business logic services** - move to Express route handlers
 - **Constants** (Virginia points, roles, billing) - no changes
 - **MUI theme configurations** - no changes
 
 ### 9.3 What Needs to Be Built New
 
-- Express.js (or Fastify) backend with REST API routes
+- Express.js backend with REST API routes
 - Authentication middleware (session-based)
 - Permission middleware for API routes
-- Docker configuration (Dockerfile, docker-compose.yml)
+- Docker configuration (Dockerfile, docker-compose.yml) — optional
 - Server-side file handling (backup/restore, image upload, CSV/PDF generation)
 - CORS configuration
 - Environment variable management
@@ -956,14 +966,14 @@ For testing and demonstration, the application includes seed data:
 
 | Entity | Count | Notes |
 |--------|-------|-------|
-| Children | 25 | Across 10 families, various ages and schedules |
-| Parents | 17 | Single and two-parent families |
-| Staff | 10 | 1 provider, 6 assistants, 2 substitutes, 1 inactive |
+| User Accounts | 6 | admin, provider, staff1, staff2, staff3, substitute |
+| Staff | 5 | Various positions with certifications and background checks |
+| Children | 10 | Various ages and schedule types |
+| Parents | 10 | Linked to children |
 | Emergency Contacts | Multiple | Linked to seeded children |
 | Staff Certifications | Multiple | CPR, First Aid, MAT for active staff |
 | Background Checks | Multiple | Various types for active staff |
 | Fee Configurations | 9 | Infant/Toddler/Preschool/School-Age, Full/Part-Time/Drop-In |
-| Invoices | 7 | With line items in various statuses |
-| Payments | 5 | Various payment methods |
-| User Accounts | 6 | admin, provider, staff, substitute users |
 | Facility Settings | Full | Virginia-based daycare configuration |
+
+Default login: `admin` / `1234`
