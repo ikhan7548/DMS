@@ -208,9 +208,9 @@ export default function BillingPage() {
                   <TableCell>Name</TableCell>
                   <TableCell>Age Group</TableCell>
                   <TableCell>Schedule</TableCell>
-                  <TableCell align="right">Amount</TableCell>
+                  <TableCell align="right">Weekly Rate</TableCell>
+                  <TableCell align="right">Daily Rate</TableCell>
                   <TableCell align="right">Registration</TableCell>
-                  <TableCell align="right">Supply Fee</TableCell>
                   <TableCell>Effective</TableCell>
                 </TableRow>
               </TableHead>
@@ -220,9 +220,9 @@ export default function BillingPage() {
                     <TableCell sx={{ fontWeight: 500 }}>{f.name}</TableCell>
                     <TableCell><Chip label={f.age_group} size="small" variant="outlined" /></TableCell>
                     <TableCell>{f.schedule_type}</TableCell>
-                    <TableCell align="right">${(f.amount || 0).toFixed(2)}</TableCell>
+                    <TableCell align="right">${(f.weekly_rate || 0).toFixed(2)}</TableCell>
+                    <TableCell align="right">${(f.daily_rate || 0).toFixed(2)}</TableCell>
                     <TableCell align="right">${(f.registration_fee || 0).toFixed(2)}</TableCell>
-                    <TableCell align="right">${(f.supply_fee || 0).toFixed(2)}</TableCell>
                     <TableCell>{f.effective_date}</TableCell>
                   </TableRow>
                 ))}
