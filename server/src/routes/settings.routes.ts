@@ -246,6 +246,52 @@ router.put('/users/:id/pin', requireAuth, requireRole('admin'), (req: Request, r
   }
 });
 
+// DELETE /api/settings/users/:id - Permanently delete a user
+router.delete('/users/:id', requireAuth, requireRole('admin'), (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+
+    // Prevent deleting yourself
+    if (userId === req.session.userId) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+
+    // Verify user exists
+    const user = sqlite.prepare(`SELECT id, username, role FROM users WHERE id = ?`).get(userId) as any;
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Prevent deleting the last admin
+    if (user.role === 'admin') {
+      const adminCount = sqlite.prepare(
+        `SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1`
+      ).get() as { count: number };
+      if (adminCount.count <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the last admin user' });
+      }
+    }
+
+    const deleteUser = sqlite.transaction(() => {
+      // Unlink from audit_log (preserve audit entries, just remove the FK reference)
+      sqlite.prepare(`UPDATE audit_log SET user_id = NULL WHERE user_id = ?`).run(userId);
+
+      // Delete the user record
+      sqlite.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
+    });
+
+    deleteUser();
+
+    // Log the deletion (after transaction since user is gone)
+    sqlite.prepare(`
+      INSERT INTO audit_log (user_id, action, entity_type, entity_id, details)
+      VALUES (?, 'delete', 'user', ?, ?)
+    `).run(req.session.userId, userId, `Deleted user: ${user.username}`);
+
+    res.json({ success: true, message: `User "${user.username}" permanently deleted` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Role Permissions ────────────────────────────────
 
 // GET /api/settings/permissions

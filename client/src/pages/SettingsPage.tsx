@@ -197,6 +197,7 @@ function FacilitySettings({ onMessage }: { onMessage: (msg: string, severity?: '
 // ─── User Management ────────────────────────────────────────
 
 function UserManagement({ onMessage }: { onMessage: (msg: string, severity?: 'success' | 'error') => void }) {
+  const { user: currentUser } = useAuthStore();
   const [users, setUsers] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,6 +213,10 @@ function UserManagement({ onMessage }: { onMessage: (msg: string, severity?: 'su
   // Reset PIN
   const [pinDialog, setPinDialog] = useState(false);
   const [pinForm, setPinForm] = useState({ userId: 0, username: '', pin: '' });
+
+  // Delete user
+  const [deleteDialog, setDeleteDialog] = useState<{ id: number; username: string } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const fetchData = () => {
     setLoading(true);
@@ -284,6 +289,19 @@ function UserManagement({ onMessage }: { onMessage: (msg: string, severity?: 'su
     } catch {}
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteDialog) return;
+    try {
+      await api.delete(`/settings/users/${deleteDialog.id}`);
+      setDeleteDialog(null);
+      setDeleteConfirmText('');
+      fetchData();
+      onMessage('User deleted successfully');
+    } catch (err: any) {
+      onMessage(err.response?.data?.error || 'Failed to delete user', 'error');
+    }
+  };
+
   if (loading) return <LinearProgress />;
 
   return (
@@ -344,6 +362,13 @@ function UserManagement({ onMessage }: { onMessage: (msg: string, severity?: 'su
                           <LockReset fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      {u.id !== currentUser?.id && (
+                        <Tooltip title="Delete User">
+                          <IconButton size="small" color="error" onClick={() => { setDeleteDialog({ id: u.id, username: u.username }); setDeleteConfirmText(''); }}>
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -470,6 +495,38 @@ function UserManagement({ onMessage }: { onMessage: (msg: string, severity?: 'su
         <DialogActions>
           <Button onClick={() => setPinDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleResetPin} disabled={!pinForm.pin || pinForm.pin.length < 4}>Reset</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={!!deleteDialog} onClose={() => { setDeleteDialog(null); setDeleteConfirmText(''); }}>
+        <DialogTitle sx={{ color: 'error.main' }}>Permanently Delete User</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            This will <strong>permanently delete</strong> user <strong>"{deleteDialog?.username}"</strong> and remove their access to the system.
+          </Typography>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Audit log entries by this user will be preserved but unlinked.
+          </Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>This action cannot be undone.</Alert>
+          <TextField
+            fullWidth
+            label={`Type "${deleteDialog?.username}" to confirm`}
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteDialog(null); setDeleteConfirmText(''); }}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleteConfirmText !== deleteDialog?.username}
+            onClick={handleDeleteUser}
+          >
+            Permanently Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </>
