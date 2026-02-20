@@ -105,6 +105,37 @@ router.put('/:id', requireAuth, (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/staff/:id - Permanently delete staff member and all associated data
+router.delete('/:id', requireAuth, (req: Request, res: Response) => {
+  try {
+    const staffId = req.params.id;
+
+    // Verify staff exists
+    const staffMember = sqlite.prepare(`SELECT id, first_name, last_name FROM staff WHERE id = ?`).get(staffId);
+    if (!staffMember) return res.status(404).json({ error: 'Staff member not found' });
+
+    // Use a transaction to delete all associated data then the staff record
+    const deleteStaff = sqlite.transaction(() => {
+      // Delete from all related tables
+      sqlite.prepare(`DELETE FROM attendance_staff WHERE staff_id = ?`).run(staffId);
+      sqlite.prepare(`DELETE FROM staff_certifications WHERE staff_id = ?`).run(staffId);
+      sqlite.prepare(`DELETE FROM background_checks WHERE staff_id = ?`).run(staffId);
+      sqlite.prepare(`DELETE FROM payroll WHERE staff_id = ?`).run(staffId);
+
+      // Unlink user accounts (set staff_id to NULL instead of deleting the user)
+      sqlite.prepare(`UPDATE users SET staff_id = NULL WHERE staff_id = ?`).run(staffId);
+
+      // Finally delete the staff record itself
+      sqlite.prepare(`DELETE FROM staff WHERE id = ?`).run(staffId);
+    });
+
+    deleteStaff();
+    res.json({ success: true, message: 'Staff member and all associated data permanently deleted' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Certifications ---
 
 router.get('/:id/certifications', requireAuth, (req: Request, res: Response) => {

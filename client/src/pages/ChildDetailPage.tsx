@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
   IconButton, LinearProgress, Alert, Paper, Snackbar, Tooltip,
 } from '@mui/material';
-import { ArrowBack, Edit, Add, Delete, Phone, Email } from '@mui/icons-material';
+import { ArrowBack, Edit, Add, Delete, Phone, Email, Warning } from '@mui/icons-material';
 import api from '../lib/api';
 
 interface ChildDetail {
@@ -69,8 +69,12 @@ export default function ChildDetailPage() {
   const [immunForm, setImmunForm] = useState({ ...emptyImmun });
   const [editingImmunId, setEditingImmunId] = useState<number | null>(null);
 
-  // Delete confirmation
+  // Delete confirmation (sub-items)
   const [deleteDialog, setDeleteDialog] = useState<{ type: string; id: number; name: string } | null>(null);
+
+  // Delete child confirmation
+  const [deleteChildOpen, setDeleteChildOpen] = useState(false);
+  const [deleteChildConfirmText, setDeleteChildConfirmText] = useState('');
 
   const fetchChild = () => {
     setLoading(true);
@@ -199,12 +203,22 @@ export default function ChildDetailPage() {
     } catch {}
   };
 
-  // ─── Delete confirmation handler ────────────────────
+  // ─── Delete confirmation handler (sub-items) ───────
   const confirmDelete = () => {
     if (!deleteDialog) return;
     if (deleteDialog.type === 'contact') handleDeleteContact(deleteDialog.id);
     else if (deleteDialog.type === 'pickup') handleDeletePickup(deleteDialog.id);
     else if (deleteDialog.type === 'immunization') handleDeleteImmun(deleteDialog.id);
+  };
+
+  // ─── Delete entire child record ────────────────────
+  const handleDeleteChild = async () => {
+    try {
+      await api.delete(`/children/${id}`);
+      navigate('/children');
+    } catch {
+      setSnack('Failed to delete child');
+    }
   };
 
   if (loading) return <LinearProgress />;
@@ -227,6 +241,7 @@ export default function ChildDetailPage() {
           </Box>
         </Box>
         <Button variant="outlined" startIcon={<Edit />} onClick={() => setEditOpen(true)}>Edit</Button>
+        <Button variant="outlined" color="error" startIcon={<Delete />} onClick={() => setDeleteChildOpen(true)}>Delete</Button>
       </Box>
 
       {/* Tabs */}
@@ -512,6 +527,47 @@ export default function ChildDetailPage() {
         <DialogActions>
           <Button onClick={() => setDeleteDialog(null)}>Cancel</Button>
           <Button variant="contained" color="error" onClick={confirmDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Child Confirmation Dialog */}
+      <Dialog open={deleteChildOpen} onClose={() => { setDeleteChildOpen(false); setDeleteChildConfirmText(''); }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Warning color="error" /> Permanently Delete Child
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            This will <strong>permanently delete</strong> {child.first_name} {child.last_name} and <strong>all associated data</strong> including:
+          </Typography>
+          <Typography component="ul" variant="body2" sx={{ pl: 2, mb: 2 }}>
+            <li>Emergency contacts</li>
+            <li>Authorized pickups</li>
+            <li>Immunization records</li>
+            <li>Attendance history</li>
+            <li>Medication logs</li>
+            <li>Incident reports</li>
+            <li>Meal logs</li>
+            <li>Invoice line items</li>
+          </Typography>
+          <Alert severity="error" sx={{ mb: 2 }}>This action cannot be undone.</Alert>
+          <TextField
+            fullWidth
+            label={`Type "${child.first_name}" to confirm`}
+            value={deleteChildConfirmText}
+            onChange={(e) => setDeleteChildConfirmText(e.target.value)}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteChildOpen(false); setDeleteChildConfirmText(''); }}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleteChildConfirmText !== child.first_name}
+            onClick={handleDeleteChild}
+          >
+            Permanently Delete
+          </Button>
         </DialogActions>
       </Dialog>
 

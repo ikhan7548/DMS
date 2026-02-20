@@ -131,11 +131,34 @@ router.put('/:id', requireAuth, (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/children/:id - Archive child
+// DELETE /api/children/:id - Permanently delete child and all associated data
 router.delete('/:id', requireAuth, (req: Request, res: Response) => {
   try {
-    sqlite.prepare(`UPDATE children SET status = 'withdrawn', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
-    res.json({ success: true });
+    const childId = req.params.id;
+
+    // Verify child exists
+    const child = sqlite.prepare(`SELECT id, first_name, last_name FROM children WHERE id = ?`).get(childId);
+    if (!child) return res.status(404).json({ error: 'Child not found' });
+
+    // Use a transaction to delete all associated data then the child
+    const deleteChild = sqlite.transaction(() => {
+      // Delete from all related tables (order doesn't matter within transaction, but delete children refs first)
+      sqlite.prepare(`DELETE FROM child_parent WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM emergency_contacts WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM authorized_pickups WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM immunizations WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM attendance_child WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM medication_logs WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM incident_reports WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM meal_log_children WHERE child_id = ?`).run(childId);
+      sqlite.prepare(`DELETE FROM invoice_line_items WHERE child_id = ?`).run(childId);
+
+      // Finally delete the child record itself
+      sqlite.prepare(`DELETE FROM children WHERE id = ?`).run(childId);
+    });
+
+    deleteChild();
+    res.json({ success: true, message: 'Child and all associated data permanently deleted' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

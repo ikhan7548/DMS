@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
   IconButton, LinearProgress, Alert, Paper, Snackbar, Tooltip,
 } from '@mui/material';
-import { ArrowBack, Edit, Add, Delete } from '@mui/icons-material';
+import { ArrowBack, Edit, Add, Delete, Warning } from '@mui/icons-material';
 import api from '../lib/api';
 
 const emptyCert = { cert_type: '', cert_name: '', issue_date: '', expiry_date: '', training_hours: '', sponsoring_org: '' };
@@ -34,8 +34,12 @@ export default function StaffDetailPage() {
   const [checkForm, setCheckForm] = useState({ ...emptyCheck });
   const [editingCheckId, setEditingCheckId] = useState<number | null>(null);
 
-  // Delete confirmation
+  // Delete confirmation (sub-items)
   const [deleteDialog, setDeleteDialog] = useState<{ type: string; id: number; name: string } | null>(null);
+
+  // Delete staff confirmation
+  const [deleteStaffOpen, setDeleteStaffOpen] = useState(false);
+  const [deleteStaffConfirmText, setDeleteStaffConfirmText] = useState('');
 
   const fetchStaff = () => {
     setLoading(true);
@@ -135,11 +139,21 @@ export default function StaffDetailPage() {
     } catch {}
   };
 
-  // ─── Delete confirmation handler ────────────────────
+  // ─── Delete confirmation handler (sub-items) ───────
   const confirmDelete = () => {
     if (!deleteDialog) return;
     if (deleteDialog.type === 'cert') handleDeleteCert(deleteDialog.id);
     else if (deleteDialog.type === 'check') handleDeleteCheck(deleteDialog.id);
+  };
+
+  // ─── Delete entire staff record ────────────────────
+  const handleDeleteStaff = async () => {
+    try {
+      await api.delete(`/staff/${id}`);
+      navigate('/staff');
+    } catch {
+      setSnack('Failed to delete staff member');
+    }
   };
 
   if (loading) return <LinearProgress />;
@@ -157,6 +171,7 @@ export default function StaffDetailPage() {
           </Box>
         </Box>
         <Button variant="outlined" startIcon={<Edit />} onClick={() => setEditOpen(true)}>Edit</Button>
+        <Button variant="outlined" color="error" startIcon={<Delete />} onClick={() => setDeleteStaffOpen(true)}>Delete</Button>
       </Box>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
@@ -371,6 +386,46 @@ export default function StaffDetailPage() {
         <DialogActions>
           <Button onClick={() => setDeleteDialog(null)}>Cancel</Button>
           <Button variant="contained" color="error" onClick={confirmDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Staff Confirmation Dialog */}
+      <Dialog open={deleteStaffOpen} onClose={() => { setDeleteStaffOpen(false); setDeleteStaffConfirmText(''); }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Warning color="error" /> Permanently Delete Staff Member
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            This will <strong>permanently delete</strong> {staff.first_name} {staff.last_name} and <strong>all associated data</strong> including:
+          </Typography>
+          <Typography component="ul" variant="body2" sx={{ pl: 2, mb: 2 }}>
+            <li>Attendance / time clock history</li>
+            <li>Certifications</li>
+            <li>Background checks</li>
+            <li>Payroll records</li>
+          </Typography>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            If this staff member has a user account, the account will be kept but unlinked from this staff record.
+          </Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>This action cannot be undone.</Alert>
+          <TextField
+            fullWidth
+            label={`Type "${staff.first_name}" to confirm`}
+            value={deleteStaffConfirmText}
+            onChange={(e) => setDeleteStaffConfirmText(e.target.value)}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteStaffOpen(false); setDeleteStaffConfirmText(''); }}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleteStaffConfirmText !== staff.first_name}
+            onClick={handleDeleteStaff}
+          >
+            Permanently Delete
+          </Button>
         </DialogActions>
       </Dialog>
 
