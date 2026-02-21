@@ -25,7 +25,9 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)',
+        background: (theme: any) => theme.palette.mode === 'dark'
+          ? 'linear-gradient(135deg, #121212 0%, #1e1e1e 100%)'
+          : 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)',
         p: 2,
       }}
     >
