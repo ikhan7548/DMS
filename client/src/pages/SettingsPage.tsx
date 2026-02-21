@@ -180,8 +180,9 @@ function FacilitySettings({ onMessage }: { onMessage: (msg: string, severity?: '
                 onChange={(e) => setSettings({ ...settings, late_pickup_grace_minutes: e.target.value })} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <TextField label="Timezone" value={settings.timezone || ''} size="small" fullWidth
-                onChange={(e) => setSettings({ ...settings, timezone: e.target.value })} />
+              <TextField label="Timezone" value={settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone} size="small" fullWidth
+                onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                helperText="Auto-detected from your browser" />
             </Grid>
           </Grid>
         </CardContent>
