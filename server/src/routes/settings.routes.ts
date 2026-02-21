@@ -17,6 +17,15 @@ const getBackupDir = () => {
   return dir;
 };
 
+// Validate backup filename to prevent path traversal
+function isValidBackupFilename(name: string): boolean {
+  // Must be a simple filename (no path separators, no ..)
+  if (!name || name.includes('/') || name.includes('\\') || name.includes('..')) return false;
+  // Must end with .db or .zip
+  if (!name.endsWith('.db') && !name.endsWith('.zip')) return false;
+  return true;
+}
+
 // ─── Auto-Backup Scheduler ─────────────────────────────
 let autoBackupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -536,7 +545,7 @@ router.post('/backup/full', requireAuth, requireRole('admin'), (req: Request, re
 router.post('/backup/download-zip', requireAuth, requireRole('admin'), (req: Request, res: Response) => {
   try {
     const { filename } = req.body;
-    if (!filename) return res.status(400).json({ error: 'Filename required' });
+    if (!filename || !isValidBackupFilename(filename)) return res.status(400).json({ error: 'Invalid filename' });
 
     const backupDir = getBackupDir();
     const filePath = pathLib.join(backupDir, filename);
@@ -604,6 +613,7 @@ router.get('/backups/:name/download', requireAuth, requireRole('admin'), (req: R
   try {
     const backupDir = getBackupDir();
     const name = req.params.name as string;
+    if (!isValidBackupFilename(name)) return res.status(400).json({ error: 'Invalid filename' });
     const filePath = pathLib.join(backupDir, name);
 
     if (!fs.existsSync(filePath)) {
@@ -621,6 +631,7 @@ router.delete('/backups/:name', requireAuth, requireRole('admin'), (req: Request
   try {
     const backupDir = getBackupDir();
     const name = req.params.name as string;
+    if (!isValidBackupFilename(name)) return res.status(400).json({ error: 'Invalid filename' });
     const filePath = pathLib.join(backupDir, name);
 
     if (!fs.existsSync(filePath)) {
@@ -644,8 +655,8 @@ router.delete('/backups/:name', requireAuth, requireRole('admin'), (req: Request
 router.post('/restore', requireAuth, requireRole('admin'), (req: Request, res: Response) => {
   try {
     const { filename } = req.body;
-    if (!filename) {
-      return res.status(400).json({ error: 'Backup filename is required' });
+    if (!filename || !isValidBackupFilename(filename)) {
+      return res.status(400).json({ error: 'Invalid backup filename' });
     }
 
     const backupDir = getBackupDir();
@@ -672,15 +683,10 @@ router.post('/restore', requireAuth, requireRole('admin'), (req: Request, res: R
     let sourceDbPath = backupPath;
 
     if (filename.endsWith('.zip')) {
-      // Extract the .db from the zip
-      const unzipper = require('unzipper') as any;
-      // For zip files, we need to find the .db file inside
-      // Use a simpler approach: extract to temp, find the db
+      // Extract the .db from the zip using adm-zip
       const tempExtractDir = pathLib.join(backupDir, `_temp_restore_${timestamp}`);
       fs.mkdirSync(tempExtractDir, { recursive: true });
 
-      // Use archiver's extract - but we don't have unzipper. Use a simpler approach.
-      // Since we know our zips contain data/daycare.db, copy it manually using streams
       const AdmZip = require('adm-zip');
       const zip = new AdmZip(backupPath);
       const entries = zip.getEntries();
