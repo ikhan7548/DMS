@@ -20,17 +20,50 @@ const getBackupDir = () => {
 // ─── Auto-Backup Scheduler ─────────────────────────────
 let autoBackupTimer: ReturnType<typeof setInterval> | null = null;
 
-function getAutoBackupSettings(): { enabled: boolean; intervalHours: number; type: string } {
+function getAutoBackupSettings(): { enabled: boolean; intervalHours: number; type: string; maxBackups: number } {
   try {
     const enabled = sqlite.prepare(`SELECT value FROM settings WHERE key = 'auto_backup_enabled'`).get() as any;
     const interval = sqlite.prepare(`SELECT value FROM settings WHERE key = 'auto_backup_interval_hours'`).get() as any;
     const type = sqlite.prepare(`SELECT value FROM settings WHERE key = 'auto_backup_type'`).get() as any;
+    const maxBackups = sqlite.prepare(`SELECT value FROM settings WHERE key = 'auto_backup_max_count'`).get() as any;
     return {
       enabled: enabled?.value === '1' || enabled?.value === 'true',
       intervalHours: parseInt(interval?.value || '24', 10),
       type: type?.value || 'data',
+      maxBackups: parseInt(maxBackups?.value || '0', 10),
     };
-  } catch { return { enabled: false, intervalHours: 24, type: 'data' }; }
+  } catch { return { enabled: false, intervalHours: 24, type: 'data', maxBackups: 0 }; }
+}
+
+// Enforce backup retention: delete oldest backups if count exceeds maxBackups
+function enforceBackupRetention() {
+  try {
+    const settings = getAutoBackupSettings();
+    if (settings.maxBackups <= 0) return; // 0 = unlimited
+
+    const backupDir = getBackupDir();
+    const files = fs.readdirSync(backupDir)
+      .filter(f => (f.endsWith('.db') || f.endsWith('.zip')) && !f.startsWith('_temp'))
+      .map(f => ({
+        name: f,
+        time: fs.statSync(pathLib.join(backupDir, f)).mtimeMs,
+      }))
+      .sort((a, b) => b.time - a.time); // newest first
+
+    if (files.length > settings.maxBackups) {
+      const toDelete = files.slice(settings.maxBackups);
+      for (const file of toDelete) {
+        try {
+          fs.unlinkSync(pathLib.join(backupDir, file.name));
+          console.log(`[Backup Retention] Deleted old backup: ${file.name}`);
+        } catch (e) {
+          console.error(`[Backup Retention] Failed to delete ${file.name}:`, e);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Backup Retention] Error:', err);
+  }
 }
 
 function performAutoBackup() {
@@ -81,6 +114,7 @@ function performAutoBackup() {
           sqlite.prepare(`INSERT INTO audit_log (user_id, action, entity_type, details) VALUES (NULL, 'backup', 'auto_full', ?)`).run(`Auto full backup: ${zipPath}`);
         } catch {}
         console.log(`[Auto-Backup] Full backup created: ${zipPath} (${archive.pointer()} bytes)`);
+        enforceBackupRetention();
       });
 
       archive.finalize();
@@ -92,6 +126,7 @@ function performAutoBackup() {
         sqlite.prepare(`INSERT INTO audit_log (user_id, action, entity_type, details) VALUES (NULL, 'backup', 'auto_data', ?)`).run(`Auto data backup: ${backupPath}`);
       } catch {}
       console.log(`[Auto-Backup] Data backup created: ${backupPath}`);
+      enforceBackupRetention();
     }
   } catch (err) {
     console.error('[Auto-Backup] Failed:', err);
@@ -134,7 +169,7 @@ router.get('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // PUT /api/settings
-router.put('/', requireAuth, requirePermission('manage_settings'), (req: Request, res: Response) => {
+router.put('/', requireAuth, requirePermission('settings_edit'), (req: Request, res: Response) => {
   try {
     const updates = req.body; // { key: value, ... }
     const upsert = sqlite.prepare(`
@@ -605,6 +640,106 @@ router.delete('/backups/:name', requireAuth, requireRole('admin'), (req: Request
   }
 });
 
+// POST /api/settings/restore – Restore from a backup file
+router.post('/restore', requireAuth, requireRole('admin'), (req: Request, res: Response) => {
+  try {
+    const { filename } = req.body;
+    if (!filename) {
+      return res.status(400).json({ error: 'Backup filename is required' });
+    }
+
+    const backupDir = getBackupDir();
+    const backupPath = pathLib.join(backupDir, filename);
+
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+
+    const dataDir = getDataDir();
+    const dbPath = pathLib.join(dataDir, 'daycare.db');
+
+    // 1. Create a pre-restore safety backup
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const safetyBackupPath = pathLib.join(backupDir, `pre-restore-backup-${timestamp}.db`);
+    try {
+      sqlite.exec(`VACUUM INTO '${safetyBackupPath}'`);
+      console.log(`[Restore] Pre-restore safety backup: ${safetyBackupPath}`);
+    } catch (e) {
+      console.error('[Restore] Failed to create safety backup:', e);
+    }
+
+    // 2. Extract the .db file from zip or use directly
+    let sourceDbPath = backupPath;
+
+    if (filename.endsWith('.zip')) {
+      // Extract the .db from the zip
+      const unzipper = require('unzipper') as any;
+      // For zip files, we need to find the .db file inside
+      // Use a simpler approach: extract to temp, find the db
+      const tempExtractDir = pathLib.join(backupDir, `_temp_restore_${timestamp}`);
+      fs.mkdirSync(tempExtractDir, { recursive: true });
+
+      // Use archiver's extract - but we don't have unzipper. Use a simpler approach.
+      // Since we know our zips contain data/daycare.db, copy it manually using streams
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(backupPath);
+      const entries = zip.getEntries();
+      let dbEntry = entries.find((e: any) => e.entryName.endsWith('daycare.db'));
+      if (!dbEntry) {
+        // Clean up temp dir
+        try { fs.rmSync(tempExtractDir, { recursive: true }); } catch {}
+        return res.status(400).json({ error: 'No database file found in zip backup' });
+      }
+      const extractedDbPath = pathLib.join(tempExtractDir, 'daycare.db');
+      fs.writeFileSync(extractedDbPath, dbEntry.getData());
+      sourceDbPath = extractedDbPath;
+    }
+
+    // 3. Close the current DB connection, replace the file, and signal restart
+    // We can't close the connection mid-request, so we copy the backup over
+    // and tell the user to restart the service
+    const restoreDbPath = pathLib.join(dataDir, 'daycare.db.restore');
+    fs.copyFileSync(sourceDbPath, restoreDbPath);
+
+    // Clean up temp extraction dir if zip
+    if (filename.endsWith('.zip')) {
+      const tempExtractDir = pathLib.join(backupDir, `_temp_restore_${timestamp}`);
+      try { fs.rmSync(tempExtractDir, { recursive: true }); } catch {}
+    }
+
+    // 4. Actually replace the database — rename current, put restore in place
+    const oldDbPath = pathLib.join(dataDir, 'daycare.db.old');
+    try { fs.unlinkSync(oldDbPath); } catch {} // Remove any previous .old file
+
+    // We need to close the database to replace it
+    // Since better-sqlite3 keeps the file locked, we'll use a different approach:
+    // Write a restore marker file that the server reads on startup
+    const markerPath = pathLib.join(dataDir, '.restore-pending');
+    fs.writeFileSync(markerPath, JSON.stringify({
+      restoreFile: restoreDbPath,
+      timestamp: new Date().toISOString(),
+      originalBackup: filename,
+    }));
+
+    // Log the restore action
+    try {
+      sqlite.prepare(`
+        INSERT INTO audit_log (user_id, action, entity_type, details)
+        VALUES (?, 'restore', 'backup', ?)
+      `).run(req.session.userId, `Restore initiated from: ${filename}`);
+    } catch {}
+
+    res.json({
+      success: true,
+      message: 'Restore prepared. The database will be replaced on next server restart. Please restart the service now.',
+      safetyBackup: `pre-restore-backup-${timestamp}.db`,
+    });
+  } catch (err: any) {
+    console.error('[Restore] Error:', err);
+    res.status(500).json({ error: err.message || 'Restore failed' });
+  }
+});
+
 // ─── Auto-Backup Settings ──────────────────────────────
 
 // GET /api/settings/auto-backup
@@ -630,7 +765,7 @@ router.get('/auto-backup', requireAuth, requireRole('admin'), (req: Request, res
 // PUT /api/settings/auto-backup
 router.put('/auto-backup', requireAuth, requireRole('admin'), (req: Request, res: Response) => {
   try {
-    const { enabled, intervalHours, type } = req.body;
+    const { enabled, intervalHours, type, maxBackups } = req.body;
 
     const upsert = sqlite.prepare(`
       INSERT INTO settings (key, value) VALUES (?, ?)
@@ -641,15 +776,19 @@ router.put('/auto-backup', requireAuth, requireRole('admin'), (req: Request, res
       if (enabled !== undefined) upsert.run('auto_backup_enabled', enabled ? '1' : '0');
       if (intervalHours !== undefined) upsert.run('auto_backup_interval_hours', String(intervalHours));
       if (type !== undefined) upsert.run('auto_backup_type', type);
+      if (maxBackups !== undefined) upsert.run('auto_backup_max_count', String(maxBackups));
     })();
 
     // Restart the scheduler with new settings
     startAutoBackupScheduler();
 
+    // Enforce retention immediately if reduced
+    enforceBackupRetention();
+
     sqlite.prepare(`
       INSERT INTO audit_log (user_id, action, entity_type, details)
       VALUES (?, 'update', 'auto_backup', ?)
-    `).run(req.session.userId, `Auto-backup ${enabled ? 'enabled' : 'disabled'}: every ${intervalHours}h, type=${type}`);
+    `).run(req.session.userId, `Auto-backup ${enabled ? 'enabled' : 'disabled'}: every ${intervalHours}h, type=${type}, max=${maxBackups || 'unlimited'}`);
 
     const updatedSettings = getAutoBackupSettings();
     res.json({ success: true, ...updatedSettings, schedulerRunning: autoBackupTimer !== null });

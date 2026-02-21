@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { sqlite } from '../db/connection';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, getPermissionsForRole } from '../middleware/auth';
 
 const router = Router();
 
@@ -37,6 +37,9 @@ router.post('/login', (req: Request, res: Response) => {
     req.session.staffId = user.staff_id;
     req.session.language = user.language;
 
+    // Get permissions for this role
+    const permissions = getPermissionsForRole(user.role);
+
     res.json({
       success: true,
       user: {
@@ -47,6 +50,7 @@ router.post('/login', (req: Request, res: Response) => {
         staffId: user.staff_id,
         language: user.language,
       },
+      permissions,
     });
   } catch (err: any) {
     console.error('Login error:', err);
@@ -70,6 +74,10 @@ router.get('/session', (req: Request, res: Response) => {
   if (!req.session || !req.session.userId) {
     return res.json({ authenticated: false });
   }
+
+  // Get permissions for this role
+  const permissions = getPermissionsForRole(req.session.role!);
+
   res.json({
     authenticated: true,
     user: {
@@ -80,6 +88,7 @@ router.get('/session', (req: Request, res: Response) => {
       staffId: req.session.staffId,
       language: req.session.language,
     },
+    permissions,
   });
 });
 

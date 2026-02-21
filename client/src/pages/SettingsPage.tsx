@@ -10,7 +10,7 @@ import {
 import {
   Save, PersonAdd, Backup, Security, Settings as SettingsIcon,
   AdminPanelSettings, Edit, LockReset, Download, Delete,
-  Palette, Language, Receipt,
+  Palette, Language, Receipt, SettingsBackupRestore,
 } from '@mui/icons-material';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
@@ -654,18 +654,27 @@ function BillingSettings({ onMessage }: { onMessage: (msg: string, severity?: 's
 const ROLES = ['admin', 'provider', 'staff', 'substitute', 'parent'];
 const FEATURES = [
   { key: 'dashboard', label: 'Dashboard' },
-  { key: 'manage_children', label: 'Manage Children' },
-  { key: 'manage_staff', label: 'Manage Staff' },
-  { key: 'manage_parents', label: 'Manage Parents' },
-  { key: 'manage_attendance', label: 'Manage Attendance' },
-  { key: 'manage_billing', label: 'Manage Billing' },
-  { key: 'view_reports', label: 'View Reports' },
-  { key: 'manage_settings', label: 'Manage Settings' },
-  { key: 'manage_users', label: 'Manage Users' },
-  { key: 'view_audit_log', label: 'View Audit Log' },
-  { key: 'manage_incidents', label: 'Manage Incidents' },
-  { key: 'manage_medications', label: 'Manage Medications' },
-  { key: 'manage_meals', label: 'Manage Meals' },
+  { key: 'children_view', label: 'View Children' },
+  { key: 'children_contacts', label: 'View Child Contacts' },
+  { key: 'children_medical', label: 'View Child Medical Info' },
+  { key: 'children_edit', label: 'Edit / Enroll Children' },
+  { key: 'children_enroll', label: 'Enroll New Children' },
+  { key: 'staff_view', label: 'View Staff' },
+  { key: 'staff_edit', label: 'Edit Staff' },
+  { key: 'attendance_checkin', label: 'Check In / Out' },
+  { key: 'attendance_checkout', label: 'Check Out' },
+  { key: 'attendance_history', label: 'Attendance History' },
+  { key: 'attendance_edit_times', label: 'Edit Attendance Times' },
+  { key: 'billing_view', label: 'View Billing' },
+  { key: 'billing_manage', label: 'Manage Billing' },
+  { key: 'meals_view', label: 'View Meals' },
+  { key: 'meals_edit', label: 'Edit Meals' },
+  { key: 'reports_view', label: 'View Reports' },
+  { key: 'reports_export', label: 'Export Reports' },
+  { key: 'settings_view', label: 'View Settings' },
+  { key: 'settings_edit', label: 'Edit Settings' },
+  { key: 'compliance_view', label: 'View Compliance' },
+  { key: 'compliance_edit', label: 'Edit Compliance' },
 ];
 
 function PermissionsSection({ onMessage }: { onMessage: (msg: string) => void }) {
@@ -776,8 +785,14 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
   const [autoEnabled, setAutoEnabled] = useState(false);
   const [autoInterval, setAutoInterval] = useState('24');
   const [autoType, setAutoType] = useState('data');
+  const [autoMaxBackups, setAutoMaxBackups] = useState('0');
   const [autoLastBackup, setAutoLastBackup] = useState<string | null>(null);
   const [autoSaving, setAutoSaving] = useState(false);
+
+  // Restore state
+  const [restoreDialog, setRestoreDialog] = useState<string | null>(null);
+  const [restoreConfirmText, setRestoreConfirmText] = useState('');
+  const [restoring, setRestoring] = useState(false);
 
   const fetchBackups = () => {
     setLoading(true);
@@ -792,6 +807,7 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
         setAutoEnabled(res.data.enabled);
         setAutoInterval(String(res.data.intervalHours));
         setAutoType(res.data.type);
+        setAutoMaxBackups(String(res.data.maxBackups || 0));
         setAutoLastBackup(res.data.lastAutoBackup);
       })
       .catch(() => {});
@@ -865,11 +881,28 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
         enabled: autoEnabled,
         intervalHours: parseInt(autoInterval, 10),
         type: autoType,
+        maxBackups: parseInt(autoMaxBackups, 10),
       });
-      onMessage(`Auto-backup ${autoEnabled ? 'enabled' : 'disabled'} — every ${autoInterval}h, ${autoType} backup`);
+      onMessage(`Auto-backup ${autoEnabled ? 'enabled' : 'disabled'} — every ${autoInterval}h, ${autoType} backup, retention: ${autoMaxBackups === '0' ? 'unlimited' : autoMaxBackups}`);
       fetchAutoSettings();
     } catch { onMessage('Failed to save auto-backup settings', 'error'); }
     setAutoSaving(false);
+  };
+
+  // Restore from backup
+  const handleRestore = async () => {
+    if (!restoreDialog || restoreConfirmText !== 'RESTORE') return;
+    setRestoring(true);
+    try {
+      const res = await api.post('/settings/restore', { filename: restoreDialog });
+      onMessage(res.data.message || 'Restore prepared. Restart the service to apply.');
+      setRestoreDialog(null);
+      setRestoreConfirmText('');
+      fetchBackups();
+    } catch (err: any) {
+      onMessage(err.response?.data?.error || 'Failed to restore backup', 'error');
+    }
+    setRestoring(false);
   };
 
   // Run auto-backup now
@@ -936,13 +969,13 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
           </Typography>
 
           <Grid container spacing={2} alignItems="center">
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, md: 2 }}>
               <FormControlLabel
                 control={<Switch checked={autoEnabled} onChange={(e) => setAutoEnabled(e.target.checked)} />}
                 label={autoEnabled ? 'Enabled' : 'Disabled'}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, md: 2 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Interval</InputLabel>
                 <Select value={autoInterval} label="Interval" onChange={(e) => setAutoInterval(e.target.value)} disabled={!autoEnabled}>
@@ -953,10 +986,11 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
                   <MenuItem value="24">Every 24 hours</MenuItem>
                   <MenuItem value="48">Every 48 hours</MenuItem>
                   <MenuItem value="168">Every 7 days</MenuItem>
+                  <MenuItem value="720">Every 30 days</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, md: 2 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Backup Type</InputLabel>
                 <Select value={autoType} label="Backup Type" onChange={(e) => setAutoType(e.target.value)} disabled={!autoEnabled}>
@@ -965,7 +999,20 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
                 </Select>
               </FormControl>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, md: 2 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Retention</InputLabel>
+                <Select value={autoMaxBackups} label="Retention" onChange={(e) => setAutoMaxBackups(e.target.value)} disabled={!autoEnabled}>
+                  <MenuItem value="0">Unlimited</MenuItem>
+                  <MenuItem value="5">Keep last 5</MenuItem>
+                  <MenuItem value="10">Keep last 10</MenuItem>
+                  <MenuItem value="15">Keep last 15</MenuItem>
+                  <MenuItem value="20">Keep last 20</MenuItem>
+                  <MenuItem value="30">Keep last 30</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button variant="contained" size="small" onClick={handleSaveAutoBackup} disabled={autoSaving}>
                   {autoSaving ? 'Saving...' : 'Save'}
@@ -1041,6 +1088,11 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
                               </Tooltip>
                             </>
                           )}
+                          <Tooltip title="Restore this backup">
+                            <IconButton size="small" color="warning" onClick={() => { setRestoreDialog(b.name); setRestoreConfirmText(''); }}>
+                              <SettingsBackupRestore fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Delete backup">
                             <IconButton size="small" color="error" onClick={() => setDeleteDialog(b.name)}>
                               <Delete fontSize="small" />
@@ -1075,6 +1127,45 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
         <DialogActions>
           <Button onClick={() => setDeleteDialog(null)}>Cancel</Button>
           <Button variant="contained" color="error" onClick={handleDelete}>Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Restore Confirmation */}
+      <Dialog open={!!restoreDialog} onClose={() => setRestoreDialog(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: 'warning.main' }}>Restore Backup</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This will replace the current database with the backup data. A safety backup will be created automatically before restoring.
+          </Alert>
+          {restoreDialog && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Backup file: <strong>{restoreDialog}</strong>
+            </Typography>
+          )}
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            After restoring, the service must be restarted for changes to take effect.
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Type <strong>RESTORE</strong> to confirm:
+          </Typography>
+          <TextField
+            fullWidth size="small"
+            value={restoreConfirmText}
+            onChange={(e) => setRestoreConfirmText(e.target.value)}
+            placeholder="Type RESTORE to confirm"
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRestoreDialog(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleRestore}
+            disabled={restoreConfirmText !== 'RESTORE' || restoring}
+          >
+            {restoring ? 'Restoring...' : 'Restore Backup'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { sqlite } from '../db/connection';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/parents
-router.get('/', requireAuth, (req: Request, res: Response) => {
+router.get('/', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const { search } = req.query;
     let query = `SELECT * FROM parents WHERE 1=1`;
@@ -41,7 +41,7 @@ router.get('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/parents/:id
-router.get('/:id', requireAuth, (req: Request, res: Response) => {
+router.get('/:id', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const parent = sqlite.prepare(`SELECT * FROM parents WHERE id = ?`).get(req.params.id);
     if (!parent) return res.status(404).json({ error: 'Parent not found' });
@@ -57,7 +57,7 @@ router.get('/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/parents
-router.post('/', requireAuth, (req: Request, res: Response) => {
+router.post('/', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(
@@ -75,7 +75,7 @@ router.post('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // PUT /api/parents/:id
-router.put('/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(
@@ -95,7 +95,7 @@ router.put('/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/parents/:id/link/:childId
-router.post('/:id/link/:childId', requireAuth, (req: Request, res: Response) => {
+router.post('/:id/link/:childId', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const { relationship } = req.body;
     sqlite.prepare(
@@ -108,7 +108,7 @@ router.post('/:id/link/:childId', requireAuth, (req: Request, res: Response) => 
 });
 
 // DELETE /api/parents/:id/unlink/:childId - Unlink parent from child
-router.delete('/:id/unlink/:childId', requireAuth, (req: Request, res: Response) => {
+router.delete('/:id/unlink/:childId', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(
       `DELETE FROM child_parent WHERE parent_id = ? AND child_id = ?`
@@ -120,7 +120,7 @@ router.delete('/:id/unlink/:childId', requireAuth, (req: Request, res: Response)
 });
 
 // DELETE /api/parents/:id
-router.delete('/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM child_parent WHERE parent_id = ?`).run(req.params.id);
     sqlite.prepare(`DELETE FROM parents WHERE id = ?`).run(req.params.id);

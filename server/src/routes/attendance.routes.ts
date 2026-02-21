@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { sqlite } from '../db/connection';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requirePermission } from '../middleware/auth';
 import { VIRGINIA_POINT_TABLE, MAX_POINTS_PER_CAREGIVER } from '../../../shared/constants/virginia-points';
 
 const router = Router();
@@ -25,7 +25,7 @@ function getPointsForAge(ageMonths: number): number {
 }
 
 // GET /api/attendance/today/children
-router.get('/today/children', requireAuth, (req: Request, res: Response) => {
+router.get('/today/children', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const d = today();
     const children = sqlite.prepare(`
@@ -49,7 +49,7 @@ router.get('/today/children', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/attendance/today/staff
-router.get('/today/staff', requireAuth, (req: Request, res: Response) => {
+router.get('/today/staff', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const d = today();
     const staffList = sqlite.prepare(`
@@ -73,7 +73,7 @@ router.get('/today/staff', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/attendance/children/checkin
-router.post('/children/checkin', requireAuth, (req: Request, res: Response) => {
+router.post('/children/checkin', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const { childId } = req.body;
     if (!childId) {
@@ -101,7 +101,7 @@ router.post('/children/checkin', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/attendance/children/:id/checkout
-router.post('/children/:id/checkout', requireAuth, (req: Request, res: Response) => {
+router.post('/children/:id/checkout', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const time = nowTime();
     sqlite.prepare(
@@ -114,7 +114,7 @@ router.post('/children/:id/checkout', requireAuth, (req: Request, res: Response)
 });
 
 // POST /api/attendance/staff/clockin
-router.post('/staff/clockin', requireAuth, (req: Request, res: Response) => {
+router.post('/staff/clockin', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const { staffId } = req.body;
     const d = today();
@@ -139,7 +139,7 @@ router.post('/staff/clockin', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/attendance/staff/:id/clockout
-router.post('/staff/:id/clockout', requireAuth, (req: Request, res: Response) => {
+router.post('/staff/:id/clockout', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const time = nowTime();
     const record = sqlite.prepare(`SELECT clock_in FROM attendance_staff WHERE id = ?`).get(req.params.id) as any;
@@ -162,7 +162,7 @@ router.post('/staff/:id/clockout', requireAuth, (req: Request, res: Response) =>
 });
 
 // GET /api/attendance/points - Virginia Point System status
-router.get('/points', requireAuth, (req: Request, res: Response) => {
+router.get('/points', requireAuth, requirePermission('attendance_checkin'), (req: Request, res: Response) => {
   try {
     const d = today();
 
@@ -217,7 +217,7 @@ router.get('/points', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/attendance/history
-router.get('/history', requireAuth, (req: Request, res: Response) => {
+router.get('/history', requireAuth, requirePermission('attendance_history'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, type, entityId } = req.query;
     const start = startDate || today();
@@ -266,7 +266,7 @@ router.get('/history', requireAuth, (req: Request, res: Response) => {
 });
 
 // PUT /api/attendance/:id/correct - Time correction
-router.put('/:id/correct', requireAuth, (req: Request, res: Response) => {
+router.put('/:id/correct', requireAuth, requirePermission('attendance_edit_times'), (req: Request, res: Response) => {
   try {
     const { type, checkIn, checkOut, reason } = req.body;
     if (!reason) {
@@ -296,7 +296,7 @@ router.put('/:id/correct', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/attendance/history - Add a new attendance record manually
-router.post('/history', requireAuth, (req: Request, res: Response) => {
+router.post('/history', requireAuth, requirePermission('attendance_edit_times'), (req: Request, res: Response) => {
   try {
     const { type, entityId, date, checkIn, checkOut, notes } = req.body;
     if (!type || !entityId || !date) {
@@ -326,7 +326,7 @@ router.post('/history', requireAuth, (req: Request, res: Response) => {
 });
 
 // DELETE /api/attendance/:id - Delete an attendance record
-router.delete('/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, requirePermission('attendance_edit_times'), (req: Request, res: Response) => {
   try {
     const { type } = req.query;
     if (type === 'child') {

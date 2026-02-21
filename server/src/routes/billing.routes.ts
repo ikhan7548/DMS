@@ -11,7 +11,7 @@ function today(): string {
 // ─── Fee Configurations ────────────────────────────────────────
 
 // GET /api/billing/fees
-router.get('/fees', requireAuth, (req: Request, res: Response) => {
+router.get('/fees', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const fees = sqlite.prepare(`SELECT * FROM fee_configurations WHERE is_active = 1 ORDER BY age_group, schedule_type`).all();
     res.json(fees);
@@ -21,7 +21,7 @@ router.get('/fees', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/billing/fees/all (include inactive)
-router.get('/fees/all', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.get('/fees/all', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const fees = sqlite.prepare(`SELECT * FROM fee_configurations ORDER BY age_group, schedule_type`).all();
     res.json(fees);
@@ -31,7 +31,7 @@ router.get('/fees/all', requireAuth, requirePermission('manage_billing'), (req: 
 });
 
 // POST /api/billing/fees
-router.post('/fees', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.post('/fees', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { name, age_group, schedule_type, weekly_rate, daily_rate, hourly_rate, registration_fee, late_pickup_fee_per_minute, late_payment_fee, sibling_discount_pct, effective_date } = req.body;
     const result = sqlite.prepare(`
@@ -45,7 +45,7 @@ router.post('/fees', requireAuth, requirePermission('manage_billing'), (req: Req
 });
 
 // PUT /api/billing/fees/:id
-router.put('/fees/:id', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.put('/fees/:id', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { name, age_group, schedule_type, weekly_rate, daily_rate, hourly_rate, registration_fee, late_pickup_fee_per_minute, late_payment_fee, sibling_discount_pct, effective_date, is_active } = req.body;
     sqlite.prepare(`
@@ -64,7 +64,7 @@ router.put('/fees/:id', requireAuth, requirePermission('manage_billing'), (req: 
 // ─── Invoices ────────────────────────────────────────
 
 // GET /api/billing/invoices
-router.get('/invoices', requireAuth, (req: Request, res: Response) => {
+router.get('/invoices', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const { status, startDate, endDate, familyId } = req.query;
     let query = `
@@ -102,7 +102,7 @@ router.get('/invoices', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/billing/invoices/:id
-router.get('/invoices/:id', requireAuth, (req: Request, res: Response) => {
+router.get('/invoices/:id', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const invoice = sqlite.prepare(`
       SELECT i.*,
@@ -132,7 +132,7 @@ router.get('/invoices/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/billing/invoices
-router.post('/invoices', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.post('/invoices', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { family_id, due_date, period_start, period_end, lineItems, notes } = req.body;
 
@@ -175,7 +175,7 @@ router.post('/invoices', requireAuth, requirePermission('manage_billing'), (req:
 });
 
 // PUT /api/billing/invoices/:id
-router.put('/invoices/:id', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.put('/invoices/:id', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { due_date, notes, status } = req.body;
     sqlite.prepare(`
@@ -190,7 +190,7 @@ router.put('/invoices/:id', requireAuth, requirePermission('manage_billing'), (r
 });
 
 // POST /api/billing/invoices/:id/void
-router.post('/invoices/:id/void', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.post('/invoices/:id/void', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`UPDATE invoices SET status = 'void', updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
     res.json({ success: true });
@@ -200,7 +200,7 @@ router.post('/invoices/:id/void', requireAuth, requirePermission('manage_billing
 });
 
 // PUT /api/billing/invoices/:id/split-billing
-router.put('/invoices/:id/split-billing', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.put('/invoices/:id/split-billing', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { split_billing_pct, split_billing_payer, split_billing_payer_address } = req.body;
     sqlite.prepare(`
@@ -225,7 +225,7 @@ router.put('/invoices/:id/split-billing', requireAuth, requirePermission('manage
 // ─── Payments ────────────────────────────────────────
 
 // POST /api/billing/payments
-router.post('/payments', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.post('/payments', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { invoice_id, family_id, amount, method, date: payDate, reference_number, notes } = req.body;
 
@@ -266,7 +266,7 @@ router.post('/payments', requireAuth, requirePermission('manage_billing'), (req:
 });
 
 // GET /api/billing/payments
-router.get('/payments', requireAuth, (req: Request, res: Response) => {
+router.get('/payments', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, method } = req.query;
     let query = `
@@ -293,7 +293,7 @@ router.get('/payments', requireAuth, (req: Request, res: Response) => {
 // ─── Family Account / Balance Summary ────────────────
 
 // GET /api/billing/family/:parentId
-router.get('/family/:parentId', requireAuth, (req: Request, res: Response) => {
+router.get('/family/:parentId', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const parentId = req.params.parentId;
 
@@ -336,7 +336,7 @@ router.get('/family/:parentId', requireAuth, (req: Request, res: Response) => {
 // ─── Aging Report ────────────────────────────────────
 
 // GET /api/billing/aging
-router.get('/aging', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.get('/aging', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const d = today();
     const invoices = sqlite.prepare(`
@@ -384,7 +384,7 @@ router.get('/aging', requireAuth, requirePermission('manage_billing'), (req: Req
 // ─── Generate Batch Invoices ─────────────────────────
 
 // POST /api/billing/generate
-router.post('/generate', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.post('/generate', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { period_start, period_end, due_date } = req.body;
 
@@ -449,7 +449,7 @@ router.post('/generate', requireAuth, requirePermission('manage_billing'), (req:
 // ─── Payment Methods ─────────────────────────────────
 
 // GET /api/billing/payment-methods
-router.get('/payment-methods', requireAuth, (req: Request, res: Response) => {
+router.get('/payment-methods', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const methods = sqlite.prepare(`SELECT * FROM payment_methods WHERE is_active = 1`).all();
     res.json(methods);
@@ -459,7 +459,7 @@ router.get('/payment-methods', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/billing/payment-methods/all (include inactive)
-router.get('/payment-methods/all', requireAuth, (req: Request, res: Response) => {
+router.get('/payment-methods/all', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const methods = sqlite.prepare(`SELECT * FROM payment_methods ORDER BY name`).all();
     res.json(methods);
@@ -469,7 +469,7 @@ router.get('/payment-methods/all', requireAuth, (req: Request, res: Response) =>
 });
 
 // POST /api/billing/payment-methods
-router.post('/payment-methods', requireAuth, (req: Request, res: Response) => {
+router.post('/payment-methods', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { name } = req.body;
     const result = sqlite.prepare(`
@@ -482,7 +482,7 @@ router.post('/payment-methods', requireAuth, (req: Request, res: Response) => {
 });
 
 // PUT /api/billing/payment-methods/:id - Update name and/or toggle active
-router.put('/payment-methods/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/payment-methods/:id', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { is_active, name } = req.body;
     if (name !== undefined) {
@@ -500,7 +500,7 @@ router.put('/payment-methods/:id', requireAuth, (req: Request, res: Response) =>
 // ─── Invoice Line Items CRUD ────────────────────────
 
 // POST /api/billing/invoices/:id/line-items
-router.post('/invoices/:id/line-items', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.post('/invoices/:id/line-items', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const invoiceId = req.params.id;
     const { description, item_type, quantity, unit_price, child_id } = req.body;
@@ -521,7 +521,7 @@ router.post('/invoices/:id/line-items', requireAuth, requirePermission('manage_b
 });
 
 // PUT /api/billing/invoices/:invoiceId/line-items/:id
-router.put('/invoices/:invoiceId/line-items/:id', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.put('/invoices/:invoiceId/line-items/:id', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     const { description, item_type, quantity, unit_price } = req.body;
     const total = (unit_price || 0) * (quantity || 1);
@@ -540,7 +540,7 @@ router.put('/invoices/:invoiceId/line-items/:id', requireAuth, requirePermission
 });
 
 // DELETE /api/billing/invoices/:invoiceId/line-items/:id
-router.delete('/invoices/:invoiceId/line-items/:id', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.delete('/invoices/:invoiceId/line-items/:id', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM invoice_line_items WHERE id = ? AND invoice_id = ?`).run(req.params.id, req.params.invoiceId);
     recalculateInvoiceTotals(Number(req.params.invoiceId));
@@ -553,7 +553,7 @@ router.delete('/invoices/:invoiceId/line-items/:id', requireAuth, requirePermiss
 // ─── Family Accounts ────────────────────────────────
 
 // GET /api/billing/families - List all families with balances
-router.get('/families', requireAuth, (req: Request, res: Response) => {
+router.get('/families', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
   try {
     const families = sqlite.prepare(`
       SELECT p.id, p.first_name, p.last_name, p.email, p.phone_cell,
@@ -574,7 +574,7 @@ router.get('/families', requireAuth, (req: Request, res: Response) => {
 });
 
 // DELETE /api/billing/fees/:id
-router.delete('/fees/:id', requireAuth, requirePermission('manage_billing'), (req: Request, res: Response) => {
+router.delete('/fees/:id', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM fee_configurations WHERE id = ?`).run(req.params.id);
     res.json({ success: true });

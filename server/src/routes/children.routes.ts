@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { sqlite } from '../db/connection';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/children - List children with optional filters
-router.get('/', requireAuth, (req: Request, res: Response) => {
+router.get('/', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const { status, search } = req.query;
     let query = `SELECT c.*, fc.name as fee_tier_name FROM children c LEFT JOIN fee_configurations fc ON c.rate_tier_id = fc.id WHERE 1=1`;
@@ -48,7 +48,7 @@ router.get('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/children/:id - Get child details with relations
-router.get('/:id', requireAuth, (req: Request, res: Response) => {
+router.get('/:id', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const child = sqlite.prepare(
       `SELECT c.*, fc.name as fee_tier_name FROM children c LEFT JOIN fee_configurations fc ON c.rate_tier_id = fc.id WHERE c.id = ?`
@@ -78,7 +78,7 @@ router.get('/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/children - Create child
-router.post('/', requireAuth, (req: Request, res: Response) => {
+router.post('/', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const today = new Date().toISOString().split('T')[0];
@@ -114,7 +114,7 @@ router.post('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // PUT /api/children/:id - Update child
-router.put('/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(`
@@ -150,7 +150,7 @@ router.put('/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // DELETE /api/children/:id - Permanently delete child and all associated data
-router.delete('/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const childId = req.params.id;
 
@@ -200,7 +200,7 @@ router.delete('/:id', requireAuth, (req: Request, res: Response) => {
 // --- Emergency Contacts ---
 
 // GET /api/children/:id/emergency-contacts
-router.get('/:id/emergency-contacts', requireAuth, (req: Request, res: Response) => {
+router.get('/:id/emergency-contacts', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const contacts = sqlite.prepare(
       `SELECT * FROM emergency_contacts WHERE child_id = ? ORDER BY priority_order`
@@ -212,7 +212,7 @@ router.get('/:id/emergency-contacts', requireAuth, (req: Request, res: Response)
 });
 
 // POST /api/children/:id/emergency-contacts
-router.post('/:id/emergency-contacts', requireAuth, (req: Request, res: Response) => {
+router.post('/:id/emergency-contacts', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(
@@ -225,7 +225,7 @@ router.post('/:id/emergency-contacts', requireAuth, (req: Request, res: Response
 });
 
 // PUT /api/children/:childId/emergency-contacts/:id
-router.put('/:childId/emergency-contacts/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:childId/emergency-contacts/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(
@@ -238,7 +238,7 @@ router.put('/:childId/emergency-contacts/:id', requireAuth, (req: Request, res: 
 });
 
 // DELETE /api/children/:childId/emergency-contacts/:id
-router.delete('/:childId/emergency-contacts/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:childId/emergency-contacts/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM emergency_contacts WHERE id=? AND child_id=?`).run(req.params.id, req.params.childId);
     res.json({ success: true });
@@ -249,7 +249,7 @@ router.delete('/:childId/emergency-contacts/:id', requireAuth, (req: Request, re
 
 // --- Authorized Pickups ---
 
-router.get('/:id/authorized-pickups', requireAuth, (req: Request, res: Response) => {
+router.get('/:id/authorized-pickups', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const pickups = sqlite.prepare(`SELECT * FROM authorized_pickups WHERE child_id = ?`).all(req.params.id);
     res.json(pickups);
@@ -258,7 +258,7 @@ router.get('/:id/authorized-pickups', requireAuth, (req: Request, res: Response)
   }
 });
 
-router.post('/:id/authorized-pickups', requireAuth, (req: Request, res: Response) => {
+router.post('/:id/authorized-pickups', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(
@@ -270,7 +270,7 @@ router.post('/:id/authorized-pickups', requireAuth, (req: Request, res: Response
   }
 });
 
-router.put('/:childId/authorized-pickups/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:childId/authorized-pickups/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(
@@ -282,7 +282,7 @@ router.put('/:childId/authorized-pickups/:id', requireAuth, (req: Request, res: 
   }
 });
 
-router.delete('/:childId/authorized-pickups/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:childId/authorized-pickups/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM authorized_pickups WHERE id=? AND child_id=?`).run(req.params.id, req.params.childId);
     res.json({ success: true });
@@ -293,7 +293,7 @@ router.delete('/:childId/authorized-pickups/:id', requireAuth, (req: Request, re
 
 // --- Immunizations ---
 
-router.get('/:id/immunizations', requireAuth, (req: Request, res: Response) => {
+router.get('/:id/immunizations', requireAuth, requirePermission('children_view'), (req: Request, res: Response) => {
   try {
     const records = sqlite.prepare(`SELECT * FROM immunizations WHERE child_id = ? ORDER BY date_administered DESC`).all(req.params.id);
     res.json(records);
@@ -302,7 +302,7 @@ router.get('/:id/immunizations', requireAuth, (req: Request, res: Response) => {
   }
 });
 
-router.post('/:id/immunizations', requireAuth, (req: Request, res: Response) => {
+router.post('/:id/immunizations', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(
@@ -314,7 +314,7 @@ router.post('/:id/immunizations', requireAuth, (req: Request, res: Response) => 
   }
 });
 
-router.put('/:childId/immunizations/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:childId/immunizations/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(
@@ -326,7 +326,7 @@ router.put('/:childId/immunizations/:id', requireAuth, (req: Request, res: Respo
   }
 });
 
-router.delete('/:childId/immunizations/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:childId/immunizations/:id', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM immunizations WHERE id=? AND child_id=?`).run(req.params.id, req.params.childId);
     res.json({ success: true });

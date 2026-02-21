@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box, Typography, Alert, Button } from '@mui/material';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 
@@ -24,6 +24,22 @@ import AgingReportPage from './pages/AgingReportPage';
 import PaymentMethodsPage from './pages/PaymentMethodsPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+
+// Permission guard component
+function PermissionGuard({ permission, children }: { permission: string; children: React.ReactNode }) {
+  const { hasPermission } = useAuthStore();
+  if (!hasPermission(permission)) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Alert severity="error" sx={{ mb: 2, maxWidth: 500, mx: 'auto' }}>
+          You do not have permission to access this page.
+        </Alert>
+        <Button variant="contained" href="/">Go to Dashboard</Button>
+      </Box>
+    );
+  }
+  return <>{children}</>;
+}
 
 function App() {
   const { isAuthenticated, isLoading, checkSession } = useAuthStore();
@@ -86,24 +102,24 @@ function App() {
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
         <Route path="/" element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
           <Route index element={<DashboardPage />} />
-          <Route path="children" element={<ChildrenPage />} />
-          <Route path="children/:id" element={<ChildDetailPage />} />
-          <Route path="staff" element={<StaffPage />} />
-          <Route path="staff/:id" element={<StaffDetailPage />} />
-          <Route path="parents" element={<ParentsPage />} />
-          <Route path="attendance" element={<AttendancePage />} />
-          <Route path="attendance/history" element={<AttendanceHistoryPage />} />
-          <Route path="billing" element={<BillingDashboardPage />} />
-          <Route path="billing/invoices" element={<BillingPage />} />
-          <Route path="billing/payments" element={<BillingPage />} />
-          <Route path="billing/invoice/:id" element={<InvoiceDetailPage />} />
-          <Route path="billing/fees" element={<FeeConfigPage />} />
-          <Route path="billing/families" element={<FamilyAccountPage />} />
-          <Route path="billing/families/:familyId" element={<FamilyAccountPage />} />
-          <Route path="billing/aging" element={<AgingReportPage />} />
-          <Route path="billing/payment-methods" element={<PaymentMethodsPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="children" element={<PermissionGuard permission="children_view"><ChildrenPage /></PermissionGuard>} />
+          <Route path="children/:id" element={<PermissionGuard permission="children_view"><ChildDetailPage /></PermissionGuard>} />
+          <Route path="staff" element={<PermissionGuard permission="staff_view"><StaffPage /></PermissionGuard>} />
+          <Route path="staff/:id" element={<PermissionGuard permission="staff_view"><StaffDetailPage /></PermissionGuard>} />
+          <Route path="parents" element={<PermissionGuard permission="children_view"><ParentsPage /></PermissionGuard>} />
+          <Route path="attendance" element={<PermissionGuard permission="attendance_checkin"><AttendancePage /></PermissionGuard>} />
+          <Route path="attendance/history" element={<PermissionGuard permission="attendance_history"><AttendanceHistoryPage /></PermissionGuard>} />
+          <Route path="billing" element={<PermissionGuard permission="billing_view"><BillingDashboardPage /></PermissionGuard>} />
+          <Route path="billing/invoices" element={<PermissionGuard permission="billing_view"><BillingPage /></PermissionGuard>} />
+          <Route path="billing/payments" element={<PermissionGuard permission="billing_view"><BillingPage /></PermissionGuard>} />
+          <Route path="billing/invoice/:id" element={<PermissionGuard permission="billing_view"><InvoiceDetailPage /></PermissionGuard>} />
+          <Route path="billing/fees" element={<PermissionGuard permission="billing_manage"><FeeConfigPage /></PermissionGuard>} />
+          <Route path="billing/families" element={<PermissionGuard permission="billing_view"><FamilyAccountPage /></PermissionGuard>} />
+          <Route path="billing/families/:familyId" element={<PermissionGuard permission="billing_view"><FamilyAccountPage /></PermissionGuard>} />
+          <Route path="billing/aging" element={<PermissionGuard permission="billing_view"><AgingReportPage /></PermissionGuard>} />
+          <Route path="billing/payment-methods" element={<PermissionGuard permission="billing_manage"><PaymentMethodsPage /></PermissionGuard>} />
+          <Route path="reports" element={<PermissionGuard permission="reports_view"><ReportsPage /></PermissionGuard>} />
+          <Route path="settings" element={<PermissionGuard permission="settings_view"><SettingsPage /></PermissionGuard>} />
         </Route>
       </Routes>
     </ThemeProvider>

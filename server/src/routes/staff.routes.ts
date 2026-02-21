@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { sqlite } from '../db/connection';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requirePermission } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/staff
-router.get('/', requireAuth, (req: Request, res: Response) => {
+router.get('/', requireAuth, requirePermission('staff_view'), (req: Request, res: Response) => {
   try {
     const { status, search } = req.query;
     let query = `SELECT * FROM staff WHERE 1=1`;
@@ -30,7 +30,7 @@ router.get('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/staff/:id
-router.get('/:id', requireAuth, (req: Request, res: Response) => {
+router.get('/:id', requireAuth, requirePermission('staff_view'), (req: Request, res: Response) => {
   try {
     const staffMember = sqlite.prepare(`SELECT * FROM staff WHERE id = ?`).get(req.params.id);
     if (!staffMember) return res.status(404).json({ error: 'Staff member not found' });
@@ -50,7 +50,7 @@ router.get('/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // POST /api/staff
-router.post('/', requireAuth, (req: Request, res: Response) => {
+router.post('/', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(`
@@ -74,7 +74,7 @@ router.post('/', requireAuth, (req: Request, res: Response) => {
 });
 
 // PUT /api/staff/:id
-router.put('/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:id', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(`
@@ -106,7 +106,7 @@ router.put('/:id', requireAuth, (req: Request, res: Response) => {
 });
 
 // DELETE /api/staff/:id - Permanently delete staff member and all associated data
-router.delete('/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const staffId = req.params.id;
 
@@ -138,7 +138,7 @@ router.delete('/:id', requireAuth, (req: Request, res: Response) => {
 
 // --- Certifications ---
 
-router.get('/:id/certifications', requireAuth, (req: Request, res: Response) => {
+router.get('/:id/certifications', requireAuth, requirePermission('staff_view'), (req: Request, res: Response) => {
   try {
     const certs = sqlite.prepare(`SELECT * FROM staff_certifications WHERE staff_id = ? ORDER BY expiry_date`).all(req.params.id);
     res.json(certs);
@@ -147,7 +147,7 @@ router.get('/:id/certifications', requireAuth, (req: Request, res: Response) => 
   }
 });
 
-router.post('/:id/certifications', requireAuth, (req: Request, res: Response) => {
+router.post('/:id/certifications', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(
@@ -159,7 +159,7 @@ router.post('/:id/certifications', requireAuth, (req: Request, res: Response) =>
   }
 });
 
-router.put('/:staffId/certifications/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:staffId/certifications/:id', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(
@@ -171,7 +171,7 @@ router.put('/:staffId/certifications/:id', requireAuth, (req: Request, res: Resp
   }
 });
 
-router.delete('/:staffId/certifications/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:staffId/certifications/:id', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM staff_certifications WHERE id=? AND staff_id=?`).run(req.params.id, req.params.staffId);
     res.json({ success: true });
@@ -182,7 +182,7 @@ router.delete('/:staffId/certifications/:id', requireAuth, (req: Request, res: R
 
 // --- Background Checks ---
 
-router.get('/:id/background-checks', requireAuth, (req: Request, res: Response) => {
+router.get('/:id/background-checks', requireAuth, requirePermission('staff_view'), (req: Request, res: Response) => {
   try {
     const checks = sqlite.prepare(`SELECT * FROM background_checks WHERE staff_id = ? ORDER BY check_date DESC`).all(req.params.id);
     res.json(checks);
@@ -191,7 +191,7 @@ router.get('/:id/background-checks', requireAuth, (req: Request, res: Response) 
   }
 });
 
-router.post('/:id/background-checks', requireAuth, (req: Request, res: Response) => {
+router.post('/:id/background-checks', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     const result = sqlite.prepare(
@@ -203,7 +203,7 @@ router.post('/:id/background-checks', requireAuth, (req: Request, res: Response)
   }
 });
 
-router.put('/:staffId/background-checks/:id', requireAuth, (req: Request, res: Response) => {
+router.put('/:staffId/background-checks/:id', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
     sqlite.prepare(
@@ -215,7 +215,7 @@ router.put('/:staffId/background-checks/:id', requireAuth, (req: Request, res: R
   }
 });
 
-router.delete('/:staffId/background-checks/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/:staffId/background-checks/:id', requireAuth, requirePermission('staff_edit'), (req: Request, res: Response) => {
   try {
     sqlite.prepare(`DELETE FROM background_checks WHERE id=? AND staff_id=?`).run(req.params.id, req.params.staffId);
     res.json({ success: true });

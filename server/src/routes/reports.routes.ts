@@ -18,7 +18,7 @@ function calculateAgeMonths(dob: string): number {
 // ─── Dashboard Summary ───────────────────────────────
 
 // GET /api/reports/dashboard
-router.get('/dashboard', requireAuth, (req: Request, res: Response) => {
+router.get('/dashboard', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const d = today();
 
@@ -100,7 +100,7 @@ router.get('/dashboard', requireAuth, (req: Request, res: Response) => {
 
 // GET /api/reports/attendance
 // Query params: startDate, endDate, type (all|children|staff), entityId, groupBy, mode (summary|detail)
-router.get('/attendance', requireAuth, (req: Request, res: Response) => {
+router.get('/attendance', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, groupBy, type, entityId, mode } = req.query;
     const start = (startDate as string) || today();
@@ -235,7 +235,7 @@ router.get('/attendance', requireAuth, (req: Request, res: Response) => {
 // ─── Financial Reports ───────────────────────────────
 
 // GET /api/reports/financial
-router.get('/financial', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/financial', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';
@@ -292,7 +292,7 @@ router.get('/financial', requireAuth, requirePermission('view_reports'), (req: R
 // ─── Financial Drill-Down ────────────────────────────
 
 // GET /api/reports/financial/invoices – Get invoices filtered by status
-router.get('/financial/invoices', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/financial/invoices', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, status } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';
@@ -332,7 +332,7 @@ router.get('/financial/invoices', requireAuth, requirePermission('view_reports')
 });
 
 // GET /api/reports/financial/payments – Get payments for a date range
-router.get('/financial/payments', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/financial/payments', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, method } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';
@@ -366,7 +366,7 @@ router.get('/financial/payments', requireAuth, requirePermission('view_reports')
 // ─── Staff Payroll Report ───────────────────────────
 
 // GET /api/reports/payroll – Calculate staff hours and estimated pay
-router.get('/payroll', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/payroll', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, staffId } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';
@@ -434,7 +434,7 @@ router.get('/payroll', requireAuth, requirePermission('view_reports'), (req: Req
 });
 
 // GET /api/reports/payroll/detail – Daily breakdown for a specific staff member
-router.get('/payroll/detail', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/payroll/detail', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, staffId } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';
@@ -482,7 +482,7 @@ router.get('/payroll/detail', requireAuth, requirePermission('view_reports'), (r
 });
 
 // GET /api/reports/export/payroll – Export payroll as CSV
-router.get('/export/payroll', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/export/payroll', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, staffId } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';
@@ -530,7 +530,7 @@ router.get('/export/payroll', requireAuth, requirePermission('view_reports'), (r
 // ─── Compliance Reports ──────────────────────────────
 
 // GET /api/reports/compliance
-router.get('/compliance', requireAuth, (req: Request, res: Response) => {
+router.get('/compliance', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     // Staff certifications status
     const certifications = sqlite.prepare(`
@@ -578,7 +578,7 @@ router.get('/compliance', requireAuth, (req: Request, res: Response) => {
 
 // GET /api/reports/export/attendance
 // Query params: startDate, endDate, type (all|children|staff), entityId
-router.get('/export/attendance', requireAuth, (req: Request, res: Response) => {
+router.get('/export/attendance', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate, type, entityId } = req.query;
     const start = (startDate as string) || today();
@@ -660,7 +660,7 @@ router.get('/export/attendance', requireAuth, (req: Request, res: Response) => {
 });
 
 // GET /api/reports/export/financial
-router.get('/export/financial', requireAuth, requirePermission('view_reports'), (req: Request, res: Response) => {
+router.get('/export/financial', requireAuth, requirePermission('reports_view'), (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
     const start = (startDate as string) || today().substring(0, 7) + '-01';

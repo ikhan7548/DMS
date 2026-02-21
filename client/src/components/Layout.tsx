@@ -16,14 +16,14 @@ import { useThemeStore } from '../stores/themeStore';
 const DRAWER_WIDTH = 260;
 
 const menuItems = [
-  { text: 'Dashboard', icon: <Dashboard />, path: '/' },
-  { text: 'Children', icon: <ChildCare />, path: '/children' },
-  { text: 'Parents', icon: <People />, path: '/parents' },
-  { text: 'Staff', icon: <Badge />, path: '/staff' },
-  { text: 'Attendance', icon: <EventAvailable />, path: '/attendance' },
-  { text: 'Billing', icon: <Receipt />, path: '/billing' },
-  { text: 'Reports', icon: <Assessment />, path: '/reports' },
-  { text: 'Settings', icon: <Settings />, path: '/settings' },
+  { text: 'Dashboard', icon: <Dashboard />, path: '/', permission: 'dashboard' },
+  { text: 'Children', icon: <ChildCare />, path: '/children', permission: 'children_view' },
+  { text: 'Parents', icon: <People />, path: '/parents', permission: 'children_view' },
+  { text: 'Staff', icon: <Badge />, path: '/staff', permission: 'staff_view' },
+  { text: 'Attendance', icon: <EventAvailable />, path: '/attendance', permission: 'attendance_checkin' },
+  { text: 'Billing', icon: <Receipt />, path: '/billing', permission: 'billing_view' },
+  { text: 'Reports', icon: <Assessment />, path: '/reports', permission: 'reports_view' },
+  { text: 'Settings', icon: <Settings />, path: '/settings', permission: 'settings_view' },
 ];
 
 export default function Layout() {
@@ -32,7 +32,7 @@ export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, logout, hasPermission } = useAuthStore();
   const { mode, toggleMode } = useThemeStore();
 
   const handleNavigation = (path: string) => {
@@ -68,7 +68,7 @@ export default function Layout() {
 
       {/* Navigation */}
       <List sx={{ flex: 1, px: 1, py: 1 }}>
-        {menuItems.map((item) => {
+        {menuItems.filter((item) => hasPermission(item.permission)).map((item) => {
           const isActive = item.path === '/'
             ? location.pathname === '/'
             : location.pathname.startsWith(item.path);

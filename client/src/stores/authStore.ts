@@ -12,6 +12,7 @@ interface User {
 
 interface AuthState {
   user: User | null;
+  permissions: Record<string, boolean>;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -19,10 +20,12 @@ interface AuthState {
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
   clearError: () => void;
+  hasPermission: (feature: string) => boolean;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  permissions: {},
   isAuthenticated: false,
   isLoading: true,
   error: null,
@@ -36,11 +39,12 @@ export const useAuthStore = create<AuthState>((set) => ({
           user: {
             id: data.user.id,
             username: data.user.username,
-            displayName: data.user.display_name,
+            displayName: data.user.displayName || data.user.display_name,
             role: data.user.role,
-            staffId: data.user.staff_id,
+            staffId: data.user.staffId || data.user.staff_id,
             language: data.user.language,
           },
+          permissions: data.permissions || {},
           isAuthenticated: true,
           isLoading: false,
         });
@@ -61,7 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       // ignore
     }
-    set({ user: null, isAuthenticated: false, isLoading: false });
+    set({ user: null, permissions: {}, isAuthenticated: false, isLoading: false });
   },
 
   checkSession: async () => {
@@ -73,21 +77,30 @@ export const useAuthStore = create<AuthState>((set) => ({
           user: {
             id: data.user.id,
             username: data.user.username,
-            displayName: data.user.display_name,
+            displayName: data.user.displayName || data.user.display_name,
             role: data.user.role,
-            staffId: data.user.staff_id,
+            staffId: data.user.staffId || data.user.staff_id,
             language: data.user.language,
           },
+          permissions: data.permissions || {},
           isAuthenticated: true,
           isLoading: false,
         });
       } else {
-        set({ user: null, isAuthenticated: false, isLoading: false });
+        set({ user: null, permissions: {}, isAuthenticated: false, isLoading: false });
       }
     } catch {
-      set({ user: null, isAuthenticated: false, isLoading: false });
+      set({ user: null, permissions: {}, isAuthenticated: false, isLoading: false });
     }
   },
 
   clearError: () => set({ error: null }),
+
+  hasPermission: (feature: string): boolean => {
+    const state = get();
+    if (!state.user) return false;
+    // Admin and provider have full access
+    if (state.user.role === 'admin' || state.user.role === 'provider') return true;
+    return !!state.permissions[feature];
+  },
 }));
