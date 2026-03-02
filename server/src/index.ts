@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
-import SqliteStore from 'better-sqlite3-session-store';
+import SqliteStoreFactory from 'better-sqlite3-session-store';
+import Database from 'better-sqlite3';
 import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
@@ -70,10 +71,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Session management — stored in SQLite so sessions survive server restarts
-const SessionStore = SqliteStore(session);
-const sessionDbPath = path.join(DATA_DIR, 'sessions.db');
+const SqliteStore = SqliteStoreFactory(session);
+const sessionDb = new Database(path.join(DATA_DIR, 'sessions.db'));
 app.use(session({
-  store: new SessionStore({ dir: path.dirname(sessionDbPath), name: 'sessions' }),
+  store: new SqliteStore({ client: sessionDb }),
   secret: process.env.SESSION_SECRET || 'daycare-management-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
