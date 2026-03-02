@@ -6,7 +6,7 @@ import {
   Alert, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Paper,
 } from '@mui/material';
-import { Login, Logout, CheckCircle, Warning, Today, History } from '@mui/icons-material';
+import { Login, Logout, CheckCircle, Warning, Today, History, VisibilityOff, Visibility } from '@mui/icons-material';
 import api from '../lib/api';
 
 interface ChildAttendance {
@@ -32,6 +32,7 @@ export default function AttendancePage() {
   const [staff, setStaff] = useState<StaffAttendance[]>([]);
   const [points, setPoints] = useState<PointsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showCompliance, setShowCompliance] = useState(() => localStorage.getItem('showCompliance') !== 'false');
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionForm, setCorrectionForm] = useState({ id: 0, type: '', checkIn: '', checkOut: '', reason: '' });
 
@@ -106,30 +107,49 @@ export default function AttendancePage() {
 
       {/* Points Summary */}
       {points && (
-        <Card sx={{ mb: 3, backgroundColor: (theme) => points.isCompliant ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.15)' : '#E8F5E9') : (theme.palette.mode === 'dark' ? 'rgba(230, 81, 0, 0.15)' : '#FFF3E0') }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-              {points.isCompliant
-                ? <CheckCircle sx={{ color: 'success.main', fontSize: 32 }} />
-                : <Warning sx={{ color: 'warning.main', fontSize: 32 }} />
-              }
-              <Typography variant="h6">
-                {points.isCompliant ? 'Compliant' : 'Non-Compliant'} - Virginia Point System
-              </Typography>
-              <Chip label={`Total Points: ${points.totalPoints}`} color="primary" />
-              <Chip label={`Staff Needed: ${points.caregiversNeeded}`} color="secondary" />
-              <Chip label={`Staff Present: ${points.caregiversPresent}`} variant="outlined" />
-              {points.breakdown.map((b, i) => (
-                <Chip key={i} label={`${b.ageGroup}: ${b.count} (${b.points}pts)`} size="small" variant="outlined" />
-              ))}
-            </Box>
-            {!points.isCompliant && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                You need {points.caregiversNeeded - points.caregiversPresent} more staff to be compliant!
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+        showCompliance ? (
+          <Card sx={{ mb: 3, backgroundColor: (theme) => points.isCompliant ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.15)' : '#E8F5E9') : (theme.palette.mode === 'dark' ? 'rgba(230, 81, 0, 0.15)' : '#FFF3E0') }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                {points.isCompliant
+                  ? <CheckCircle sx={{ color: 'success.main', fontSize: 32 }} />
+                  : <Warning sx={{ color: 'warning.main', fontSize: 32 }} />
+                }
+                <Typography variant="h6" sx={{ flex: 1 }}>
+                  {points.isCompliant ? 'Compliant' : 'Non-Compliant'} - Virginia Point System
+                </Typography>
+                <Button size="small" variant="text" startIcon={<VisibilityOff />}
+                  onClick={() => { setShowCompliance(false); localStorage.setItem('showCompliance', 'false'); }}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Hide
+                </Button>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                <Chip label={`Total Points: ${points.totalPoints}`} color="primary" />
+                <Chip label={`Staff Needed: ${points.caregiversNeeded}`} color="secondary" />
+                <Chip label={`Staff Present: ${points.caregiversPresent}`} variant="outlined" />
+                {points.breakdown.map((b, i) => (
+                  <Chip key={i} label={`${b.ageGroup}: ${b.count} (${b.points}pts)`} size="small" variant="outlined" />
+                ))}
+              </Box>
+              {!points.isCompliant && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  You need {points.caregiversNeeded - points.caregiversPresent} more staff to be compliant!
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button size="small" variant="text" startIcon={<Visibility />}
+              onClick={() => { setShowCompliance(true); localStorage.setItem('showCompliance', 'true'); }}
+              sx={{ color: 'text.secondary' }}
+            >
+              Show Compliance
+            </Button>
+          </Box>
+        )
       )}
 
       {/* Quick Stats */}
