@@ -188,7 +188,7 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {children.map((child) => (
+                {[...children].sort((a, b) => Number(b.checked_in) - Number(a.checked_in) || a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)).map((child) => (
                   <TableRow key={child.id}>
                     <TableCell sx={{ fontWeight: 500 }}>
                       {child.first_name} {child.last_name}
@@ -244,7 +244,7 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {staff.map((s) => (
+                {[...staff].sort((a, b) => Number(b.clocked_in) - Number(a.clocked_in) || a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)).map((s) => (
                   <TableRow key={s.id}>
                     <TableCell sx={{ fontWeight: 500 }}>{s.first_name} {s.last_name}</TableCell>
                     <TableCell><Chip label={s.position || 'Staff'} size="small" variant="outlined" /></TableCell>
