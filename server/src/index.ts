@@ -77,7 +77,7 @@ app.use(session({
   cookie: {
     secure: false, // Set true behind HTTPS reverse proxy
     httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days of inactivity before logout
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours of inactivity before logout
     sameSite: 'lax',
   },
 }));
