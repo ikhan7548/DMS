@@ -14,7 +14,10 @@ function today(): string {
 }
 
 function nowTime(): string {
-  return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 function calculateAgeMonths(dob: string): number {

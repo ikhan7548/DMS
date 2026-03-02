@@ -233,7 +233,7 @@ export default function AttendanceHistoryPage() {
               />
               {editForm.checkOut && (
                 <Button size="small" color="warning" variant="outlined"
-                  onClick={() => setEditForm({ ...editForm, checkOut: '' })}
+                  onClick={() => setEditForm({ ...editForm, checkOut: '', reason: editForm.reason || 'Checkout time removed' })}
                   sx={{ whiteSpace: 'nowrap' }}
                 >
                   Clear
