@@ -73,10 +73,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'daycare-management-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Reset expiry on every request so session stays alive while actively used
   cookie: {
     secure: false, // Set true behind HTTPS reverse proxy
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days of inactivity before logout
     sameSite: 'lax',
   },
 }));
