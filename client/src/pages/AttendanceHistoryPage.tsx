@@ -225,11 +225,21 @@ export default function AttendanceHistoryPage() {
               onChange={(e) => setEditForm({ ...editForm, checkIn: e.target.value })}
               InputLabelProps={{ shrink: true }}
             />
-            <TextField
-              label="Check Out Time" type="time" value={editForm.checkOut}
-              onChange={(e) => setEditForm({ ...editForm, checkOut: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-            />
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <TextField
+                label="Check Out Time" type="time" value={editForm.checkOut} fullWidth
+                onChange={(e) => setEditForm({ ...editForm, checkOut: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+              {editForm.checkOut && (
+                <Button size="small" color="warning" variant="outlined"
+                  onClick={() => setEditForm({ ...editForm, checkOut: '' })}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  Clear
+                </Button>
+              )}
+            </Box>
             <TextField
               label="Reason for Correction (required)" value={editForm.reason}
               onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
