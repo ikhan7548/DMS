@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box, Typography, Card, CardContent, Grid2 as Grid, Tabs, Tab, Button,
   TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -10,7 +10,7 @@ import {
 import {
   Save, PersonAdd, Backup, Security, Settings as SettingsIcon,
   AdminPanelSettings, Edit, LockReset, Download, Delete,
-  Palette, Language, Receipt, SettingsBackupRestore,
+  Palette, Language, Receipt, SettingsBackupRestore, CloudUpload,
 } from '@mui/icons-material';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
@@ -795,6 +795,10 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
   const [restoreConfirmText, setRestoreConfirmText] = useState('');
   const [restoring, setRestoring] = useState(false);
 
+  // Upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
   const fetchBackups = () => {
     setLoading(true);
     api.get('/settings/backups')
@@ -915,6 +919,34 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
     } catch { onMessage('Failed to trigger auto-backup', 'error'); }
   };
 
+  // Upload backup file and trigger restore
+  const handleUploadRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so the same file can be re-selected
+    e.target.value = '';
+    if (!file.name.endsWith('.db') && !file.name.endsWith('.zip')) {
+      onMessage('Only .db and .zip backup files are accepted', 'error');
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('backupFile', file);
+      const res = await api.post('/settings/restore/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onMessage(`Uploaded ${file.name} (${formatSize(res.data.size)})`);
+      fetchBackups();
+      // Open restore confirmation dialog for the uploaded file
+      setRestoreDialog(res.data.filename);
+      setRestoreConfirmText('');
+    } catch (err: any) {
+      onMessage(err.response?.data?.error || 'Failed to upload backup', 'error');
+    }
+    setUploading(false);
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -949,7 +981,30 @@ function BackupSection({ onMessage }: { onMessage: (msg: string, severity?: 'suc
             >
               {creatingFull ? 'Creating...' : 'Full App Backup'}
             </Button>
+            <Button
+              variant="outlined"
+              startIcon={<CloudUpload />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || creatingData || creatingFull}
+            >
+              {uploading ? 'Uploading...' : 'Upload & Restore'}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".db,.zip"
+              hidden
+              onChange={handleUploadRestore}
+            />
           </Box>
+          {uploading && (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgress />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Uploading backup file...
+              </Typography>
+            </Box>
+          )}
           {creatingFull && (
             <Box sx={{ mt: 2 }}>
               <LinearProgress />

@@ -3,6 +3,7 @@ import { sqlite } from '../db/connection';
 import { requireAuth, requirePermission, requireRole } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import archiver from 'archiver';
+import multer from 'multer';
 import fs from 'fs';
 import pathLib from 'path';
 
@@ -649,6 +650,39 @@ router.delete('/backups/:name', requireAuth, requireRole('admin'), (req: Request
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/settings/restore/upload – Upload a backup file from the user's computer
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, getBackupDir()),
+    filename: (_req, file, cb) => {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      cb(null, `uploaded-${timestamp}-${safeName}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    if (file.originalname.endsWith('.db') || file.originalname.endsWith('.zip')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only .db and .zip files are allowed'));
+    }
+  },
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
+});
+
+router.post('/restore/upload', requireAuth, requireRole('admin'), (req: Request, res: Response, next) => {
+  upload.single('backupFile')(req, res, (err: any) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Upload failed' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const stat = fs.statSync(req.file.path);
+    res.json({ success: true, filename: req.file.filename, size: stat.size });
+  });
 });
 
 // POST /api/settings/restore – Restore from a backup file
