@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Card, CardContent, Grid2 as Grid, Tabs, Tab, Button,
@@ -35,8 +35,10 @@ export default function AttendancePage() {
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionForm, setCorrectionForm] = useState({ id: 0, type: '', checkIn: '', checkOut: '', reason: '' });
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const isFirstLoad = useRef(true);
+
+  const fetchAll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [childRes, staffRes, pointsRes] = await Promise.all([
         api.get('/attendance/today/children'),
@@ -47,10 +49,15 @@ export default function AttendancePage() {
       setStaff(staffRes.data);
       setPoints(pointsRes.data);
     } catch {}
-    setLoading(false);
-  };
+    if (!silent) setLoading(false);
+  }, []);
 
-  useEffect(() => { fetchAll(); }, []);
+  // Initial load + auto-refresh every 30 seconds for multi-device sync
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(() => fetchAll(true), 30000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
 
   const handleChildCheckIn = async (childId: number) => {
     try {

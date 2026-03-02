@@ -81,7 +81,8 @@ router.get('/:id', requireAuth, requirePermission('children_view'), (req: Reques
 router.post('/', requireAuth, requirePermission('children_edit'), (req: Request, res: Response) => {
   try {
     const d = req.body;
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const result = sqlite.prepare(`
       INSERT INTO children (first_name, last_name, nickname, sex, date_of_birth, home_address,
         enrollment_date, expected_schedule, days_per_week, scheduled_days, school_dismissal_time,

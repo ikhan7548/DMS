@@ -886,7 +886,7 @@ router.post('/communication-log', requireAuth, (req: Request, res: Response) => 
     const result = sqlite.prepare(`
       INSERT INTO communication_log (type, recipient, subject, message, date)
       VALUES (?, ?, ?, ?, ?)
-    `).run(type || 'note', recipient || null, subject || null, message, commDate || new Date().toISOString().split('T')[0]);
+    `).run(type || 'note', recipient || null, subject || null, message, commDate || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })());
     res.json({ success: true, id: Number(result.lastInsertRowid) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -973,7 +973,7 @@ router.post('/medications', requireAuth, (req: Request, res: Response) => {
 router.get('/meals', requireAuth, (req: Request, res: Response) => {
   try {
     const { date: queryDate } = req.query;
-    const d = (queryDate as string) || new Date().toISOString().split('T')[0];
+    const d = (queryDate as string) || (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })();
     const meals = sqlite.prepare(`
       SELECT ml.*, GROUP_CONCAT(c.first_name || ' ' || c.last_name) as children_names
       FROM meal_logs ml
