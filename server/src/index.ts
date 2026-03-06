@@ -8,38 +8,12 @@ import path from 'path';
 import fs from 'fs';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
-// ─── Check for pending restore ───────────────────────
+// NOTE: Restore-on-startup logic lives in db/connection.ts so it runs
+// BEFORE the database file is opened (import hoisting would otherwise
+// open the DB before this code could swap the file).
+
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const DATA_DIR = process.env.DATA_DIR || path.join(PROJECT_ROOT, 'data');
-const restoreMarkerPath = path.join(DATA_DIR, '.restore-pending');
-
-if (fs.existsSync(restoreMarkerPath)) {
-  try {
-    const marker = JSON.parse(fs.readFileSync(restoreMarkerPath, 'utf-8'));
-    const restoreFile = marker.restoreFile;
-    const dbPath = path.join(DATA_DIR, 'daycare.db');
-
-    if (fs.existsSync(restoreFile)) {
-      console.log(`[Restore] Applying pending restore from: ${marker.originalBackup}`);
-      // Rename current DB to .old
-      const oldDbPath = path.join(DATA_DIR, 'daycare.db.old');
-      try { fs.unlinkSync(oldDbPath); } catch {}
-      if (fs.existsSync(dbPath)) {
-        fs.renameSync(dbPath, oldDbPath);
-      }
-      // Move restored DB into place
-      fs.renameSync(restoreFile, dbPath);
-      console.log(`[Restore] Database restored successfully.`);
-    } else {
-      console.error(`[Restore] Restore file not found: ${restoreFile}`);
-    }
-    // Remove the marker
-    fs.unlinkSync(restoreMarkerPath);
-  } catch (err) {
-    console.error('[Restore] Error during restore:', err);
-    try { fs.unlinkSync(restoreMarkerPath); } catch {}
-  }
-}
 
 // Import routes
 import authRoutes from './routes/auth.routes';
