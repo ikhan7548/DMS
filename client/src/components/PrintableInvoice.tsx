@@ -51,7 +51,8 @@ function InvoicePage({
       ...(isSecondPage ? { pageBreakBefore: 'always' } : {}),
       p: 4,
       fontSize: '12px',
-      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
       minHeight: '100vh',
       boxSizing: 'border-box',
     }}>
@@ -218,7 +219,7 @@ function InvoicePage({
       )}
 
       {/* Footer */}
-      <Box sx={{ position: 'absolute', bottom: 40, left: 40, right: 40, textAlign: 'center', borderTop: '1px solid #ccc', pt: 2 }}>
+      <Box sx={{ mt: 'auto', textAlign: 'center', borderTop: '1px solid #ccc', pt: 2 }}>
         <Typography variant="caption" color="text.secondary">
           Thank you for your business! Payment is due by {invoice.due_date}.
         </Typography>
@@ -249,10 +250,11 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
         display: 'none',
         '@media print': {
           display: 'block',
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
+          position: 'absolute',
+          top: 0, left: 0, width: '100%',
           backgroundColor: 'white',
           zIndex: 9999,
+          overflow: 'visible',
         },
       }}>
         <InvoicePage
@@ -273,11 +275,11 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
       display: 'none',
       '@media print': {
         display: 'block',
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
+        position: 'absolute',
+        top: 0, left: 0, width: '100%',
         backgroundColor: 'white',
         zIndex: 9999,
-        overflow: 'auto',
+        overflow: 'visible',
       },
     }}>
       {/* Page 1: Parent Invoice */}
