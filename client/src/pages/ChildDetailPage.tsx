@@ -27,10 +27,22 @@ interface ChildDetail {
   physician_phone: string;
   medical_insurance: string;
   dietary_restrictions: string;
+  rate_tier_id: number | null;
+  fee_tier_name: string | null;
   parents: any[];
   emergencyContacts: any[];
   authorizedPickups: any[];
   immunizations: any[];
+}
+
+interface FeeConfig {
+  id: number;
+  name: string;
+  age_group: string;
+  schedule_type: string;
+  weekly_rate: number;
+  daily_rate: number;
+  hourly_rate: number;
 }
 
 function calculateAge(dob: string): string {
@@ -54,6 +66,9 @@ export default function ChildDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [snack, setSnack] = useState('');
+
+  // Fee configs for dropdown
+  const [feeConfigs, setFeeConfigs] = useState<FeeConfig[]>([]);
 
   // Edit child
   const [editOpen, setEditOpen] = useState(false);
@@ -98,6 +113,9 @@ export default function ChildDetailPage() {
   };
 
   useEffect(() => { fetchChild(); }, [id]);
+  useEffect(() => {
+    api.get('/billing/fees').then(res => setFeeConfigs(res.data)).catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     try {
@@ -331,6 +349,7 @@ export default function ChildDetailPage() {
                 <InfoRow label="Date of Birth" value={child.date_of_birth} />
                 <InfoRow label="Gender" value={child.sex} />
                 <InfoRow label="Schedule" value={child.expected_schedule?.replace('_', ' ')} />
+                <InfoRow label="Fee Schedule" value={child.fee_tier_name || 'Not assigned'} />
                 <InfoRow label="Enrolled" value={child.enrollment_date} />
               </CardContent>
             </Card>
@@ -549,6 +568,15 @@ export default function ChildDetailPage() {
             <TextField label="First Name" value={editForm.first_name || ''} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })} />
             <TextField label="Last Name" value={editForm.last_name || ''} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} />
             <TextField label="Nickname" value={editForm.nickname || ''} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} />
+            <TextField label="Fee Schedule" select value={editForm.rate_tier_id ?? ''} onChange={(e) => setEditForm({ ...editForm, rate_tier_id: e.target.value === '' ? null : Number(e.target.value) })}>
+              <MenuItem value="">None (auto-match by age)</MenuItem>
+              {feeConfigs.map(f => (
+                <MenuItem key={f.id} value={f.id}>
+                  {f.name} — ${f.weekly_rate || f.daily_rate || f.hourly_rate}/
+                  {f.weekly_rate ? 'week' : f.daily_rate ? 'day' : 'hour'}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField label="Allergies" value={editForm.allergies || ''} onChange={(e) => setEditForm({ ...editForm, allergies: e.target.value })} multiline rows={2} />
             <TextField label="Dietary Restrictions" value={editForm.dietary_restrictions || ''} onChange={(e) => setEditForm({ ...editForm, dietary_restrictions: e.target.value })} multiline rows={2} />
             <TextField label="Notes" value={editForm.notes || ''} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} multiline rows={2} />

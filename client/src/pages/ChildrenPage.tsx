@@ -23,6 +23,7 @@ interface Child {
   allergies: string | null;
   notes: string | null;
   enrollment_date: string;
+  rate_tier_id: number | null;
   fee_tier_name: string | null;
   parent_name: string | null;
   parent_phone: string | null;
@@ -36,9 +37,18 @@ interface ChildFormData {
   date_of_birth: string;
   gender: 'male' | 'female' | 'other';
   schedule_type: 'full_time' | 'part_time' | 'drop_in';
+  rate_tier_id: number | null;
   allergies: string;
   medical_notes: string;
   notes: string;
+}
+
+interface FeeConfig {
+  id: number;
+  name: string;
+  weekly_rate: number;
+  daily_rate: number;
+  hourly_rate: number;
 }
 
 const emptyForm: ChildFormData = {
@@ -48,6 +58,7 @@ const emptyForm: ChildFormData = {
   date_of_birth: '',
   gender: 'male',
   schedule_type: 'full_time',
+  rate_tier_id: null,
   allergies: '',
   medical_notes: '',
   notes: '',
@@ -115,6 +126,17 @@ export default function ChildrenPage() {
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [form, setForm] = useState<ChildFormData>(emptyForm);
   const [formError, setFormError] = useState('');
+  const [feeConfigs, setFeeConfigs] = useState<FeeConfig[]>([]);
+
+  // Fetch fee configs for dropdown
+  const { } = useQuery<FeeConfig[]>({
+    queryKey: ['feeConfigs'],
+    queryFn: async () => {
+      const res = await api.get('/billing/fees');
+      setFeeConfigs(res.data);
+      return res.data;
+    },
+  });
 
   // Fetch children
   const { data: children = [], isLoading, error } = useQuery<Child[]>({
@@ -138,6 +160,7 @@ export default function ChildrenPage() {
         dateOfBirth: data.date_of_birth,
         enrollmentDate: new Date().toISOString().split('T')[0],
         expectedSchedule: data.schedule_type,
+        rateTierId: data.rate_tier_id || null,
         allergies: data.allergies || null,
         notes: [data.medical_notes, data.notes].filter(Boolean).join('\n---\n') || null,
       }),
@@ -160,6 +183,7 @@ export default function ChildrenPage() {
         sex: data.gender,
         date_of_birth: data.date_of_birth,
         expected_schedule: data.schedule_type,
+        rate_tier_id: data.rate_tier_id || null,
         allergies: data.allergies || null,
         notes: [data.medical_notes, data.notes].filter(Boolean).join('\n---\n') || null,
         status: editingChild?.status || 'active',
@@ -205,6 +229,7 @@ export default function ChildrenPage() {
       schedule_type: (['full_time', 'part_time', 'drop_in'].includes(child.expected_schedule)
         ? child.expected_schedule
         : 'full_time') as ChildFormData['schedule_type'],
+      rate_tier_id: child.rate_tier_id || null,
       allergies: child.allergies || '',
       medical_notes: noteParts.length > 1 ? noteParts[0] : '',
       notes: noteParts.length > 1 ? noteParts.slice(1).join('\n---\n') : (child.notes || ''),
@@ -471,6 +496,23 @@ export default function ChildrenPage() {
                 <MenuItem value="full_time">Full Time</MenuItem>
                 <MenuItem value="part_time">Part Time</MenuItem>
                 <MenuItem value="drop_in">Drop In</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Fee Schedule</InputLabel>
+              <Select
+                value={form.rate_tier_id ?? ''}
+                label="Fee Schedule"
+                onChange={(e) => setForm(prev => ({ ...prev, rate_tier_id: e.target.value === '' ? null : Number(e.target.value) }))}
+              >
+                <MenuItem value="">None (auto-match by age)</MenuItem>
+                {feeConfigs.map(f => (
+                  <MenuItem key={f.id} value={f.id}>
+                    {f.name} — ${f.weekly_rate || f.daily_rate || f.hourly_rate}/
+                    {f.weekly_rate ? 'week' : f.daily_rate ? 'day' : 'hour'}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 

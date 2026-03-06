@@ -395,7 +395,7 @@ router.post('/generate', requireAuth, requirePermission('billing_manage'), (req:
     // Get all active children with their fee config and primary billing parent
     const children = sqlite.prepare(`
       SELECT c.id as child_id, c.first_name, c.last_name, c.expected_schedule, c.date_of_birth,
-        cp.parent_id as family_id
+        c.rate_tier_id, cp.parent_id as family_id
       FROM children c
       JOIN child_parent cp ON c.id = cp.child_id
       WHERE c.status = 'active'
@@ -417,14 +417,22 @@ router.post('/generate', requireAuth, requirePermission('billing_manage'), (req:
 
     const transaction = sqlite.transaction(() => {
       for (const child of children) {
-        // Find matching fee config
-        const ageMonths = calculateAgeMonths(child.date_of_birth);
-        const ageGroup = getAgeGroup(ageMonths);
-        const fee = sqlite.prepare(`
-          SELECT * FROM fee_configurations
-          WHERE age_group = ? AND schedule_type = ? AND is_active = 1
-          ORDER BY effective_date DESC LIMIT 1
-        `).get(ageGroup, child.expected_schedule || 'full_time') as any;
+        // Find matching fee config — use manually assigned fee first, fall back to auto-match
+        let fee: any = null;
+        if (child.rate_tier_id) {
+          fee = sqlite.prepare(
+            `SELECT * FROM fee_configurations WHERE id = ? AND is_active = 1`
+          ).get(child.rate_tier_id);
+        }
+        if (!fee) {
+          const ageMonths = calculateAgeMonths(child.date_of_birth);
+          const ageGroup = getAgeGroup(ageMonths);
+          fee = sqlite.prepare(`
+            SELECT * FROM fee_configurations
+            WHERE age_group = ? AND schedule_type = ? AND is_active = 1
+            ORDER BY effective_date DESC LIMIT 1
+          `).get(ageGroup, child.expected_schedule || 'full_time');
+        }
 
         if (!fee) continue;
 
