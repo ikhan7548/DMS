@@ -60,6 +60,12 @@ export default function BillingPage() {
     queryFn: () => api.get('/parents').then(r => r.data),
   });
 
+  const { data: billingSettings } = useQuery({
+    queryKey: ['billing-settings'],
+    queryFn: () => api.get('/settings').then(r => r.data),
+  });
+  const dueDateType = billingSettings?.invoice_due_date_type || 'days_after';
+
   const createInvoiceMutation = useMutation({
     mutationFn: (data: any) => api.post('/billing/invoices', data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['invoices'] }); setInvoiceDialog(false); },
@@ -270,7 +276,14 @@ export default function BillingPage() {
                 ))}
               </Select>
             </FormControl>
-            <TextField label="Due Date" type="date" value={invoiceForm.due_date} onChange={(e) => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })} InputLabelProps={{ shrink: true }} />
+            {dueDateType === 'upon_receipt' ? (
+              <TextField label="Due Date" value="Due upon receipt" disabled fullWidth
+                helperText="Change in Settings → Billing & Invoices" />
+            ) : (
+              <TextField label="Due Date" type="date" value={invoiceForm.due_date}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })}
+                InputLabelProps={{ shrink: true }} fullWidth />
+            )}
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField label="Period Start" type="date" value={invoiceForm.period_start} onChange={(e) => setInvoiceForm({ ...invoiceForm, period_start: e.target.value })} InputLabelProps={{ shrink: true }} fullWidth />
               <TextField label="Period End" type="date" value={invoiceForm.period_end} onChange={(e) => setInvoiceForm({ ...invoiceForm, period_end: e.target.value })} InputLabelProps={{ shrink: true }} fullWidth />

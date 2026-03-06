@@ -74,7 +74,7 @@ function InvoicePage({
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>INVOICE</Typography>
           <Typography variant="body2"><strong>Invoice #:</strong> {invoice.invoice_number}</Typography>
           <Typography variant="body2"><strong>Date:</strong> {invoice.issued_date}</Typography>
-          <Typography variant="body2"><strong>Due Date:</strong> {invoice.due_date}</Typography>
+          <Typography variant="body2"><strong>Due Date:</strong> {invoice.due_date || 'Due upon receipt'}</Typography>
           <Typography variant="body2"><strong>Period:</strong> {invoice.period_start} to {invoice.period_end}</Typography>
           {isSplit && portionLabel && (
             <Box sx={{ mt: 1, p: 0.5, px: 1, backgroundColor: '#e3f2fd', display: 'inline-block', borderRadius: 1 }}>
@@ -221,7 +221,7 @@ function InvoicePage({
       {/* Footer */}
       <Box sx={{ mt: 'auto', textAlign: 'center', borderTop: '1px solid #ccc', pt: 2 }}>
         <Typography variant="caption" color="text.secondary">
-          Thank you for your business! Payment is due by {invoice.due_date}.
+          Thank you for your business!{invoice.due_date ? ` Payment is due by ${invoice.due_date}.` : ' Payment is due upon receipt.'}
         </Typography>
         <br />
         <Typography variant="caption" color="text.secondary">

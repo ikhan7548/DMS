@@ -238,7 +238,7 @@ export default function InvoiceDetailPage() {
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
                   <Typography variant="caption" color="text.secondary">Due Date</Typography>
-                  <Typography variant="body2">{invoice.due_date}</Typography>
+                  <Typography variant="body2">{invoice.due_date || 'Due upon receipt'}</Typography>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
                   <Typography variant="caption" color="text.secondary">Period Start</Typography>
