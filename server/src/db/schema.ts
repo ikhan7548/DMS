@@ -225,6 +225,7 @@ export const payments = sqliteTable('payments', {
   date: text('date').notNull(),
   amount: real('amount').notNull(),
   method: text('method').notNull().default('cash'),
+  payer_type: text('payer_type', { enum: ['parent', 'third_party'] }).notNull().default('parent'),
   reference_number: text('reference_number'),
   notes: text('notes'),
   created_at: text('created_at').notNull().default(sql`(datetime('now'))`),

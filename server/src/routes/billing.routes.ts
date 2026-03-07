@@ -231,7 +231,7 @@ router.put('/invoices/:id/split-billing', requireAuth, requirePermission('billin
 // POST /api/billing/payments
 router.post('/payments', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
-    const { invoice_id, family_id, amount, method, date: payDate, reference_number, notes } = req.body;
+    const { invoice_id, family_id, amount, method, date: payDate, reference_number, notes, payer_type } = req.body;
 
     const transaction = sqlite.transaction(() => {
       // Determine family_id from invoice if not provided
@@ -242,9 +242,9 @@ router.post('/payments', requireAuth, requirePermission('billing_manage'), (req:
       }
 
       const result = sqlite.prepare(`
-        INSERT INTO payments (family_id, invoice_id, date, amount, method, reference_number, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(fid, invoice_id || null, payDate || today(), amount, method || 'cash', reference_number || null, notes || null);
+        INSERT INTO payments (family_id, invoice_id, date, amount, method, payer_type, reference_number, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(fid, invoice_id || null, payDate || today(), amount, method || 'cash', payer_type || 'parent', reference_number || null, notes || null);
 
       // Update invoice amounts if linked to an invoice
       if (invoice_id) {

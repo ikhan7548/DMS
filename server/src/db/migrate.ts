@@ -209,6 +209,7 @@ function createTables() {
       date TEXT NOT NULL,
       amount REAL NOT NULL,
       method TEXT NOT NULL DEFAULT 'cash',
+      payer_type TEXT NOT NULL DEFAULT 'parent',
       reference_number TEXT,
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -370,6 +371,16 @@ function createTables() {
   `);
 
   console.log('All tables created successfully.');
+
+  // ─── Column Migrations (safe for existing databases) ───
+
+  // Add payer_type to payments (for split billing payment tracking)
+  try {
+    sqlite.exec(`ALTER TABLE payments ADD COLUMN payer_type TEXT NOT NULL DEFAULT 'parent'`);
+    console.log('  Added payer_type column to payments table.');
+  } catch {
+    // Column already exists — safe to ignore
+  }
 }
 
 createTables();

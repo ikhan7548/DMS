@@ -36,7 +36,7 @@ export default function InvoiceDetailPage() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     amount: '', method: 'cash', date: new Date().toISOString().split('T')[0],
-    reference_number: '', notes: '',
+    reference_number: '', notes: '', payer_type: 'parent',
   });
 
   // Settings for printable invoice
@@ -142,9 +142,10 @@ export default function InvoiceDetailPage() {
         date: paymentForm.date,
         reference_number: paymentForm.reference_number,
         notes: paymentForm.notes,
+        payer_type: paymentForm.payer_type,
       });
       setPaymentOpen(false);
-      setPaymentForm({ amount: '', method: 'cash', date: new Date().toISOString().split('T')[0], reference_number: '', notes: '' });
+      setPaymentForm({ amount: '', method: 'cash', date: new Date().toISOString().split('T')[0], reference_number: '', notes: '', payer_type: 'parent' });
       setSnackbar({ open: true, message: 'Payment recorded' });
       fetchInvoice();
     } catch { setSnackbar({ open: true, message: 'Failed to record payment' }); }
@@ -178,6 +179,16 @@ export default function InvoiceDetailPage() {
   const parentPortion = splitEnabled ? invoiceTotal * ((parseFloat(splitPct) || 100) / 100) : invoiceTotal;
   const thirdPartyPortion = splitEnabled ? invoiceTotal - parentPortion : 0;
 
+  // Per-payer payment tracking
+  const parentPaid = invoice ? (invoice.payments || [])
+    .filter((p: any) => p.payer_type !== 'third_party')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) : 0;
+  const thirdPartyPaid = invoice ? (invoice.payments || [])
+    .filter((p: any) => p.payer_type === 'third_party')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) : 0;
+  const parentBalance = splitEnabled ? Math.max(0, parentPortion - parentPaid) : 0;
+  const thirdPartyBalance = splitEnabled ? Math.max(0, thirdPartyPortion - thirdPartyPaid) : 0;
+
   if (loading) return <LinearProgress />;
   if (!invoice) return <Alert severity="error">Invoice not found</Alert>;
 
@@ -200,7 +211,8 @@ export default function InvoiceDetailPage() {
         </Box>
         {isEditable && (
           <Button variant="contained" startIcon={<Payment />} onClick={() => {
-            setPaymentForm({ ...paymentForm, amount: String(invoice.balance_due || 0) });
+            const defaultAmount = splitEnabled ? parentBalance : (invoice.balance_due || 0);
+            setPaymentForm({ ...paymentForm, amount: String(defaultAmount.toFixed(2)), payer_type: 'parent' });
             setPaymentOpen(true);
           }}>
             Record Payment
@@ -309,22 +321,44 @@ export default function InvoiceDetailPage() {
                     <Typography variant="subtitle1" fontWeight={700}>${(invoice.total || 0).toFixed(2)}</Typography>
                   </Box>
 
-                  {/* Split billing breakdown */}
+                  {/* Split billing breakdown with per-payer tracking */}
                   {splitEnabled && (
                     <>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5, backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(21, 101, 192, 0.15)' : '#e3f2fd', px: 1, borderRadius: 1, mt: 0.5 }}>
-                        <Typography variant="body2" color="primary">Parent Portion ({splitPct}%)</Typography>
-                        <Typography variant="body2" fontWeight={600} color="primary">${parentPortion.toFixed(2)}</Typography>
+                      {/* Parent Portion */}
+                      <Box sx={{ backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(21, 101, 192, 0.15)' : '#e3f2fd', px: 1, borderRadius: 1, mt: 0.5, py: 0.5 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="primary">Parent Portion ({splitPct}%)</Typography>
+                          <Typography variant="body2" fontWeight={600} color="primary">${parentPortion.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" color="success.main">Paid</Typography>
+                          <Typography variant="caption" color="success.main">${parentPaid.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" fontWeight={600} color={parentBalance > 0 ? 'error.main' : 'success.main'}>Balance</Typography>
+                          <Typography variant="caption" fontWeight={600} color={parentBalance > 0 ? 'error.main' : 'success.main'}>${parentBalance.toFixed(2)}</Typography>
+                        </Box>
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5, backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(230, 81, 0, 0.15)' : '#fff3e0', px: 1, borderRadius: 1, mt: 0.5 }}>
-                        <Typography variant="body2" color="warning.main">Third-Party ({(100 - (parseFloat(splitPct) || 0))}%)</Typography>
-                        <Typography variant="body2" fontWeight={600} color="warning.main">${thirdPartyPortion.toFixed(2)}</Typography>
+                      {/* Third-Party Portion */}
+                      <Box sx={{ backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(230, 81, 0, 0.15)' : '#fff3e0', px: 1, borderRadius: 1, mt: 0.5, py: 0.5 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="warning.main">{splitPayer || 'Third-Party'} ({(100 - (parseFloat(splitPct) || 0))}%)</Typography>
+                          <Typography variant="body2" fontWeight={600} color="warning.main">${thirdPartyPortion.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" color="success.main">Paid</Typography>
+                          <Typography variant="caption" color="success.main">${thirdPartyPaid.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="caption" fontWeight={600} color={thirdPartyBalance > 0 ? 'error.main' : 'success.main'}>Balance</Typography>
+                          <Typography variant="caption" fontWeight={600} color={thirdPartyBalance > 0 ? 'error.main' : 'success.main'}>${thirdPartyBalance.toFixed(2)}</Typography>
+                        </Box>
                       </Box>
                     </>
                   )}
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5, mt: 0.5 }}>
-                    <Typography variant="body2" color="success.main">Paid</Typography>
+                    <Typography variant="body2" color="success.main">Total Paid</Typography>
                     <Typography variant="body2" color="success.main">${(invoice.amount_paid || 0).toFixed(2)}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
@@ -445,7 +479,11 @@ export default function InvoiceDetailPage() {
                     <Box sx={{ p: 1.5, backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(21, 101, 192, 0.15)' : '#e3f2fd', borderRadius: 1, textAlign: 'center' }}>
                       <Typography variant="caption">Parent Portion ({invoice.split_billing_pct}%)</Typography>
                       <Typography variant="h6" color="primary" fontWeight={700}>
-                        ${(invoiceTotal * (invoice.split_billing_pct / 100)).toFixed(2)}
+                        ${parentPortion.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" color="success.main">Paid: ${parentPaid.toFixed(2)}</Typography>
+                      <Typography variant="caption" display="block" fontWeight={600} color={parentBalance > 0 ? 'error.main' : 'success.main'}>
+                        Balance: ${parentBalance.toFixed(2)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -455,7 +493,11 @@ export default function InvoiceDetailPage() {
                         {invoice.split_billing_payer || 'Third-Party'} ({100 - invoice.split_billing_pct}%)
                       </Typography>
                       <Typography variant="h6" color="warning.main" fontWeight={700}>
-                        ${(invoiceTotal - invoiceTotal * (invoice.split_billing_pct / 100)).toFixed(2)}
+                        ${thirdPartyPortion.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" color="success.main">Paid: ${thirdPartyPaid.toFixed(2)}</Typography>
+                      <Typography variant="caption" display="block" fontWeight={600} color={thirdPartyBalance > 0 ? 'error.main' : 'success.main'}>
+                        Balance: ${thirdPartyBalance.toFixed(2)}
                       </Typography>
                     </Box>
                   </Grid>
@@ -484,7 +526,17 @@ export default function InvoiceDetailPage() {
                       <Typography variant="body2">{p.date}</Typography>
                       <Typography variant="body2" fontWeight={600} color="success.main">${(p.amount || 0).toFixed(2)}</Typography>
                     </Box>
-                    <Chip label={p.method} size="small" variant="outlined" sx={{ mt: 0.5 }} />
+                    <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+                      <Chip label={p.method} size="small" variant="outlined" />
+                      {splitEnabled && (
+                        <Chip
+                          label={p.payer_type === 'third_party' ? (splitPayer || 'Third-Party') : 'Parent'}
+                          size="small"
+                          color={p.payer_type === 'third_party' ? 'warning' : 'primary'}
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
                     {p.reference_number && <Typography variant="caption" display="block">Ref: {p.reference_number}</Typography>}
                     {p.notes && <Typography variant="caption" display="block" color="text.secondary">{p.notes}</Typography>}
                   </Paper>
@@ -553,6 +605,29 @@ export default function InvoiceDetailPage() {
         <DialogTitle>Record Payment</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            {/* Payer selector for split invoices */}
+            {splitEnabled && (
+              <FormControl fullWidth>
+                <InputLabel>Paid By</InputLabel>
+                <Select value={paymentForm.payer_type} label="Paid By"
+                  onChange={(e) => {
+                    const pt = e.target.value;
+                    const newAmount = pt === 'third_party' ? thirdPartyBalance : parentBalance;
+                    setPaymentForm({ ...paymentForm, payer_type: pt, amount: newAmount > 0 ? newAmount.toFixed(2) : '' });
+                  }}>
+                  <MenuItem value="parent">Parent ({parseFloat(splitPct)}%) — owes ${parentPortion.toFixed(2)}</MenuItem>
+                  <MenuItem value="third_party">{splitPayer || 'Third-Party'} ({(100 - (parseFloat(splitPct) || 0))}%) — owes ${thirdPartyPortion.toFixed(2)}</MenuItem>
+                </Select>
+              </FormControl>
+            )}
+            {splitEnabled && (
+              <Alert severity="info" sx={{ py: 0 }}>
+                {paymentForm.payer_type === 'third_party'
+                  ? `${splitPayer || 'Third-Party'} balance: $${thirdPartyBalance.toFixed(2)}`
+                  : `Parent balance: $${parentBalance.toFixed(2)}`
+                }
+              </Alert>
+            )}
             <TextField
               label="Amount" type="number" value={paymentForm.amount}
               onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}

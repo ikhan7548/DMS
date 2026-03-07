@@ -19,6 +19,7 @@ function InvoicePage({
   portionLabel,
   portionPct,
   portionTotal,
+  portionPaid,
   showSplitNote,
   splitCounterparty,
   splitCounterpartyPct,
@@ -33,6 +34,7 @@ function InvoicePage({
   portionLabel?: string;
   portionPct?: number;
   portionTotal?: number;
+  portionPaid?: number;
   showSplitNote?: boolean;
   splitCounterparty?: string;
   splitCounterpartyPct?: number;
@@ -45,6 +47,8 @@ function InvoicePage({
 
   const isSplit = portionPct != null && portionPct < 100;
   const displayTotal = isSplit ? (portionTotal || 0) : (invoice.total || 0);
+  const displayPaid = isSplit ? (portionPaid || 0) : (invoice.amount_paid || 0);
+  const displayBalance = Math.max(0, displayTotal - displayPaid);
 
   return (
     <Box sx={{
@@ -190,12 +194,20 @@ function InvoicePage({
           )}
 
           {isSplit && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
-              <Typography variant="body1" sx={{ fontWeight: 700 }}>Amount Due:</Typography>
-              <Typography variant="body1" sx={{ fontWeight: 700, color: displayTotal > 0 ? '#d32f2f' : '#2e7d32' }}>
-                ${displayTotal.toFixed(2)}
-              </Typography>
-            </Box>
+            <>
+              {displayPaid > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                  <Typography variant="body2">Amount Paid:</Typography>
+                  <Typography variant="body2" sx={{ color: '#2e7d32' }}>${displayPaid.toFixed(2)}</Typography>
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body1" sx={{ fontWeight: 700 }}>Balance Due:</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: displayBalance > 0 ? '#d32f2f' : '#2e7d32' }}>
+                  ${displayBalance.toFixed(2)}
+                </Typography>
+              </Box>
+            </>
           )}
         </Box>
       </Box>
@@ -242,6 +254,14 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
   const thirdPartyTotal = (invoice.total || 0) * (thirdPartyPct / 100);
   const thirdPartyName = invoice.split_billing_payer || 'Third-Party Payer';
   const thirdPartyAddress = invoice.split_billing_payer_address || '';
+
+  // Per-payer payment amounts
+  const parentPaid = (invoice.payments || [])
+    .filter((p: any) => p.payer_type !== 'third_party')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  const thirdPartyPaid = (invoice.payments || [])
+    .filter((p: any) => p.payer_type === 'third_party')
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
   if (!hasSplit) {
     // Standard single invoice
@@ -293,6 +313,7 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
         portionLabel="Parent Portion"
         portionPct={parentPct}
         portionTotal={parentTotal}
+        portionPaid={parentPaid}
         showSplitNote={true}
         splitCounterparty={thirdPartyName}
         splitCounterpartyPct={thirdPartyPct}
@@ -308,6 +329,7 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
         portionLabel={`${thirdPartyName} Portion`}
         portionPct={thirdPartyPct}
         portionTotal={thirdPartyTotal}
+        portionPaid={thirdPartyPaid}
         showSplitNote={true}
         splitCounterparty={`${invoice.parent_first_name || invoice.family_first_name || ''} ${invoice.parent_last_name || invoice.family_last_name || ''}`.trim()}
         splitCounterpartyPct={parentPct}
