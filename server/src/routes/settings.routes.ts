@@ -492,12 +492,18 @@ router.post('/backup/full', requireAuth, requireRole('admin'), (req: Request, re
     archive.append(
       `# Daycare Management System - Full Backup\n` +
       `# Created: ${new Date().toISOString()}\n\n` +
-      `## Restore Instructions\n\n` +
+      `## Windows Restore\n\n` +
+      `1. Extract this zip to a folder\n` +
+      `2. Make sure Node.js is installed (https://nodejs.org/)\n` +
+      `3. Double-click start.bat — it handles everything automatically\n` +
+      `   (installs dependencies, runs migration, builds client, starts server)\n\n` +
+      `## Linux / Production Server Restore\n\n` +
       `1. Extract this zip to a folder on your server\n` +
-      `2. Run: npm install && cd server && npm install && cd ../client && npm install\n` +
-      `3. Copy data/daycare.db to the data/ folder\n` +
-      `4. Run: npx tsx server/src/index.ts\n` +
-      `5. Open http://localhost:3001 in your browser\n\n` +
+      `2. Run: npm run install:all\n` +
+      `3. Run: npm run db:migrate\n` +
+      `4. Run: npm run build:client\n` +
+      `5. Run: npx tsx server/src/index.ts\n` +
+      `6. Open http://localhost:3001 in your browser\n\n` +
       `## Docker Deployment\n\n` +
       `1. Extract this zip\n` +
       `2. Run: docker-compose up -d\n`,
