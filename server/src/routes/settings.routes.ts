@@ -102,20 +102,39 @@ function performAutoBackup() {
       const clientDist = pathLib.join(PROJECT_ROOT, 'client', 'dist');
       if (fs.existsSync(clientDist)) archive.directory(clientDist, 'client/dist');
 
-      // Add server source
+      // Add source code
       const serverSrc = pathLib.join(PROJECT_ROOT, 'server', 'src');
       if (fs.existsSync(serverSrc)) archive.directory(serverSrc, 'server/src');
+      const clientSrc = pathLib.join(PROJECT_ROOT, 'client', 'src');
+      if (fs.existsSync(clientSrc)) archive.directory(clientSrc, 'client/src');
+      const clientPublic = pathLib.join(PROJECT_ROOT, 'client', 'public');
+      if (fs.existsSync(clientPublic)) archive.directory(clientPublic, 'client/public');
+      const sharedDir = pathLib.join(PROJECT_ROOT, 'shared');
+      if (fs.existsSync(sharedDir)) archive.directory(sharedDir, 'shared');
+      const docsDir = pathLib.join(PROJECT_ROOT, 'docs');
+      if (fs.existsSync(docsDir)) archive.directory(docsDir, 'docs');
 
-      // Add config files
-      const configFiles = ['package.json', 'docker-compose.yml', 'Dockerfile', '.env.example'];
-      for (const cf of configFiles) {
+      // Add root-level files
+      const rootFiles = [
+        'package.json', 'package-lock.json', 'docker-compose.yml', 'Dockerfile',
+        '.env.example', '.gitignore', 'start.bat', 'CLAUDE.md', 'CHANGELOG.md', 'README.md', 'DD_logo.png',
+      ];
+      for (const cf of rootFiles) {
         const cfPath = pathLib.join(PROJECT_ROOT, cf);
         if (fs.existsSync(cfPath)) archive.file(cfPath, { name: cf });
       }
-      const serverPkg = pathLib.join(PROJECT_ROOT, 'server', 'package.json');
-      if (fs.existsSync(serverPkg)) archive.file(serverPkg, { name: 'server/package.json' });
-      const clientPkg = pathLib.join(PROJECT_ROOT, 'client', 'package.json');
-      if (fs.existsSync(clientPkg)) archive.file(clientPkg, { name: 'client/package.json' });
+
+      // Add sub-project configs
+      const subConfigs = [
+        'server/package.json', 'server/package-lock.json', 'server/tsconfig.json',
+        'client/package.json', 'client/package-lock.json', 'client/tsconfig.json',
+        'client/tsconfig.app.json', 'client/tsconfig.node.json', 'client/vite.config.ts',
+        'client/index.html',
+      ];
+      for (const sc of subConfigs) {
+        const scPath = pathLib.join(PROJECT_ROOT, sc);
+        if (fs.existsSync(scPath)) archive.file(scPath, { name: sc });
+      }
 
       output.on('close', () => {
         // Clean temp db
@@ -484,9 +503,13 @@ router.post('/backup/full', requireAuth, requireRole('admin'), (req: Request, re
       archive.file(clientIndex, { name: 'client/index.html' });
     }
 
-    // 5. Config files at root level
-    const rootConfigs = ['package.json', 'package-lock.json', 'docker-compose.yml', 'Dockerfile', '.env.example', '.gitignore', 'tsconfig.json'];
-    for (const cf of rootConfigs) {
+    // 5. Config & root-level files
+    const rootFiles = [
+      'package.json', 'package-lock.json', 'docker-compose.yml', 'Dockerfile',
+      '.env.example', '.gitignore', 'tsconfig.json',
+      'start.bat', 'CLAUDE.md', 'CHANGELOG.md', 'README.md', 'DD_logo.png',
+    ];
+    for (const cf of rootFiles) {
       const cfPath = pathLib.join(PROJECT_ROOT, cf);
       if (fs.existsSync(cfPath)) archive.file(cfPath, { name: cf });
     }
@@ -512,6 +535,12 @@ router.post('/backup/full', requireAuth, requireRole('admin'), (req: Request, re
     const sharedDir = pathLib.join(PROJECT_ROOT, 'shared');
     if (fs.existsSync(sharedDir)) {
       archive.directory(sharedDir, 'shared');
+    }
+
+    // 7b. Client public folder (PWA manifest, icons, favicon)
+    const clientPublic = pathLib.join(PROJECT_ROOT, 'client', 'public');
+    if (fs.existsSync(clientPublic)) {
+      archive.directory(clientPublic, 'client/public');
     }
 
     // 8. Docs folder
