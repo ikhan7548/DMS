@@ -18,6 +18,45 @@ const getBackupDir = () => {
   return dir;
 };
 
+// Folders/patterns to EXCLUDE from full backups
+const BACKUP_EXCLUDE = new Set([
+  'node_modules', '.git', '.claude', 'data', 'backups',
+]);
+const BACKUP_EXCLUDE_EXTENSIONS = new Set([
+  '.log', '.db', '.db-wal', '.db-shm',
+]);
+const BACKUP_EXCLUDE_FILES = new Set([
+  '.env', 'nul',
+]);
+
+/**
+ * Recursively add all project files to an archiver instance.
+ * Automatically includes everything EXCEPT node_modules, .git, data, logs, etc.
+ * No hardcoded file lists — new files are picked up automatically.
+ */
+function addProjectFilesToArchive(archive: archiver.Archiver, dir: string, prefix: string = '') {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const name = entry.name;
+    const fullPath = pathLib.join(dir, name);
+    const archivePath = prefix ? `${prefix}/${name}` : name;
+
+    if (entry.isDirectory()) {
+      // Skip excluded directories
+      if (BACKUP_EXCLUDE.has(name)) continue;
+      addProjectFilesToArchive(archive, fullPath, archivePath);
+    } else {
+      // Skip excluded files
+      if (BACKUP_EXCLUDE_FILES.has(name)) continue;
+      const ext = pathLib.extname(name).toLowerCase();
+      if (BACKUP_EXCLUDE_EXTENSIONS.has(ext)) continue;
+      // Skip temp files
+      if (name.startsWith('_temp')) continue;
+      archive.file(fullPath, { name: archivePath });
+    }
+  }
+}
+
 // Validate backup filename to prevent path traversal
 function isValidBackupFilename(name: string): boolean {
   // Must be a simple filename (no path separators, no ..)
@@ -98,43 +137,8 @@ function performAutoBackup() {
       sqlite.exec(`VACUUM INTO '${tempDbPath}'`);
       archive.file(tempDbPath, { name: 'data/daycare.db' });
 
-      // Add client dist
-      const clientDist = pathLib.join(PROJECT_ROOT, 'client', 'dist');
-      if (fs.existsSync(clientDist)) archive.directory(clientDist, 'client/dist');
-
-      // Add source code
-      const serverSrc = pathLib.join(PROJECT_ROOT, 'server', 'src');
-      if (fs.existsSync(serverSrc)) archive.directory(serverSrc, 'server/src');
-      const clientSrc = pathLib.join(PROJECT_ROOT, 'client', 'src');
-      if (fs.existsSync(clientSrc)) archive.directory(clientSrc, 'client/src');
-      const clientPublic = pathLib.join(PROJECT_ROOT, 'client', 'public');
-      if (fs.existsSync(clientPublic)) archive.directory(clientPublic, 'client/public');
-      const sharedDir = pathLib.join(PROJECT_ROOT, 'shared');
-      if (fs.existsSync(sharedDir)) archive.directory(sharedDir, 'shared');
-      const docsDir = pathLib.join(PROJECT_ROOT, 'docs');
-      if (fs.existsSync(docsDir)) archive.directory(docsDir, 'docs');
-
-      // Add root-level files
-      const rootFiles = [
-        'package.json', 'package-lock.json', 'docker-compose.yml', 'Dockerfile',
-        '.env.example', '.gitignore', 'start.bat', 'CLAUDE.md', 'CHANGELOG.md', 'README.md', 'DD_logo.png',
-      ];
-      for (const cf of rootFiles) {
-        const cfPath = pathLib.join(PROJECT_ROOT, cf);
-        if (fs.existsSync(cfPath)) archive.file(cfPath, { name: cf });
-      }
-
-      // Add sub-project configs
-      const subConfigs = [
-        'server/package.json', 'server/package-lock.json', 'server/tsconfig.json',
-        'client/package.json', 'client/package-lock.json', 'client/tsconfig.json',
-        'client/tsconfig.app.json', 'client/tsconfig.node.json', 'client/vite.config.ts',
-        'client/index.html',
-      ];
-      for (const sc of subConfigs) {
-        const scPath = pathLib.join(PROJECT_ROOT, sc);
-        if (fs.existsSync(scPath)) archive.file(scPath, { name: sc });
-      }
+      // Add all project files (auto-discovers, excludes node_modules/.git/data/logs)
+      addProjectFilesToArchive(archive, PROJECT_ROOT);
 
       output.on('close', () => {
         // Clean temp db
@@ -481,75 +485,10 @@ router.post('/backup/full', requireAuth, requireRole('admin'), (req: Request, re
     sqlite.exec(`VACUUM INTO '${tempDbPath}'`);
     archive.file(tempDbPath, { name: 'data/daycare.db' });
 
-    // 2. Client dist (built frontend)
-    const clientDist = pathLib.join(PROJECT_ROOT, 'client', 'dist');
-    if (fs.existsSync(clientDist)) {
-      archive.directory(clientDist, 'client/dist');
-    }
+    // 2. All project files (auto-discovers everything, excludes node_modules/.git/data/logs)
+    addProjectFilesToArchive(archive, PROJECT_ROOT);
 
-    // 3. Server source code
-    const serverSrc = pathLib.join(PROJECT_ROOT, 'server', 'src');
-    if (fs.existsSync(serverSrc)) {
-      archive.directory(serverSrc, 'server/src');
-    }
-
-    // 4. Client source code
-    const clientSrc = pathLib.join(PROJECT_ROOT, 'client', 'src');
-    if (fs.existsSync(clientSrc)) {
-      archive.directory(clientSrc, 'client/src');
-    }
-    const clientIndex = pathLib.join(PROJECT_ROOT, 'client', 'index.html');
-    if (fs.existsSync(clientIndex)) {
-      archive.file(clientIndex, { name: 'client/index.html' });
-    }
-
-    // 5. Config & root-level files
-    const rootFiles = [
-      'package.json', 'package-lock.json', 'docker-compose.yml', 'Dockerfile',
-      '.env.example', '.gitignore', 'tsconfig.json',
-      'start.bat', 'CLAUDE.md', 'CHANGELOG.md', 'README.md', 'DD_logo.png',
-    ];
-    for (const cf of rootFiles) {
-      const cfPath = pathLib.join(PROJECT_ROOT, cf);
-      if (fs.existsSync(cfPath)) archive.file(cfPath, { name: cf });
-    }
-
-    // 6. Server and client package.json + tsconfig
-    const subConfigs = [
-      { src: 'server/package.json', dest: 'server/package.json' },
-      { src: 'server/package-lock.json', dest: 'server/package-lock.json' },
-      { src: 'server/tsconfig.json', dest: 'server/tsconfig.json' },
-      { src: 'client/package.json', dest: 'client/package.json' },
-      { src: 'client/package-lock.json', dest: 'client/package-lock.json' },
-      { src: 'client/tsconfig.json', dest: 'client/tsconfig.json' },
-      { src: 'client/tsconfig.app.json', dest: 'client/tsconfig.app.json' },
-      { src: 'client/tsconfig.node.json', dest: 'client/tsconfig.node.json' },
-      { src: 'client/vite.config.ts', dest: 'client/vite.config.ts' },
-    ];
-    for (const sc of subConfigs) {
-      const scPath = pathLib.join(PROJECT_ROOT, sc.src);
-      if (fs.existsSync(scPath)) archive.file(scPath, { name: sc.dest });
-    }
-
-    // 7. Shared folder
-    const sharedDir = pathLib.join(PROJECT_ROOT, 'shared');
-    if (fs.existsSync(sharedDir)) {
-      archive.directory(sharedDir, 'shared');
-    }
-
-    // 7b. Client public folder (PWA manifest, icons, favicon)
-    const clientPublic = pathLib.join(PROJECT_ROOT, 'client', 'public');
-    if (fs.existsSync(clientPublic)) {
-      archive.directory(clientPublic, 'client/public');
-    }
-
-    // 8. Docs folder
-    const docsDir = pathLib.join(PROJECT_ROOT, 'docs');
-    if (fs.existsSync(docsDir)) {
-      archive.directory(docsDir, 'docs');
-    }
-
-    // 9. Add a restore instruction file
+    // 3. Add a restore instruction file
     archive.append(
       `# Daycare Management System - Full Backup\n` +
       `# Created: ${new Date().toISOString()}\n\n` +
