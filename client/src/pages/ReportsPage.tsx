@@ -34,7 +34,11 @@ interface EntityOption {
 
 function formatHours(hours?: number | null): string {
   if (hours == null) return '-';
-  return `${hours.toFixed(1)} hrs`;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 function formatCurrency(amount?: number | null): string {
@@ -342,7 +346,7 @@ export default function ReportsPage() {
                   <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" fontWeight={600}>Total Records: {attRecords.length}</Typography>
                     {attRecords.some(r => r.totalHours != null) && (
-                      <Typography variant="body2" fontWeight={600}>Total Hours: {attRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0).toFixed(1)}</Typography>
+                      <Typography variant="body2" fontWeight={600}>Total Hours: {formatHours(attRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0))}</Typography>
                     )}
                   </Box>
                 )}
@@ -571,9 +575,9 @@ export default function ReportsPage() {
               {/* Payroll Summary Cards */}
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 {[
-                  { label: 'Total Hours', value: payData.totals?.total_hours?.toFixed(1) || '0', suffix: ' hrs', color: '#1565C0' },
-                  { label: 'Regular Hours', value: payData.totals?.regular_hours?.toFixed(1) || '0', suffix: ' hrs', color: '#2E7D32' },
-                  { label: 'Overtime Hours', value: payData.totals?.overtime_hours?.toFixed(1) || '0', suffix: ' hrs', color: '#E65100' },
+                  { label: 'Total Hours', value: formatHours(payData.totals?.total_hours), suffix: '', color: '#1565C0' },
+                  { label: 'Regular Hours', value: formatHours(payData.totals?.regular_hours), suffix: '', color: '#2E7D32' },
+                  { label: 'Overtime Hours', value: formatHours(payData.totals?.overtime_hours), suffix: '', color: '#E65100' },
                   { label: 'Total Gross Pay', value: formatCurrency(payData.totals?.gross_pay), suffix: '', color: '#6A1B9A' },
                 ].map(s => (
                   <Grid size={{ xs: 6, md: 3 }} key={s.label}>
@@ -625,9 +629,9 @@ export default function ReportsPage() {
                           <TableCell align="right">{formatCurrency(s.hourly_rate)}</TableCell>
                           <TableCell align="right">{formatCurrency(s.overtime_rate)}</TableCell>
                           <TableCell align="right">{s.days_worked}</TableCell>
-                          <TableCell align="right">{s.regular_hours?.toFixed(1)}</TableCell>
-                          <TableCell align="right" sx={{ color: s.overtime_hours > 0 ? 'warning.main' : undefined }}>{s.overtime_hours?.toFixed(1)}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>{s.total_hours?.toFixed(1)}</TableCell>
+                          <TableCell align="right">{formatHours(s.regular_hours)}</TableCell>
+                          <TableCell align="right" sx={{ color: s.overtime_hours > 0 ? 'warning.main' : undefined }}>{formatHours(s.overtime_hours)}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>{formatHours(s.total_hours)}</TableCell>
                           <TableCell align="right">{formatCurrency(s.regular_pay)}</TableCell>
                           <TableCell align="right" sx={{ color: s.overtime_pay > 0 ? 'warning.main' : undefined }}>{formatCurrency(s.overtime_pay)}</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatCurrency(s.gross_pay)}</TableCell>
@@ -645,9 +649,9 @@ export default function ReportsPage() {
                         <TableRow sx={{ '& td': { fontWeight: 700, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'grey.900' : 'grey.50', borderTop: '2px solid', borderColor: 'divider' } }}>
                           <TableCell colSpan={4}>TOTALS</TableCell>
                           <TableCell align="right">{payData.staff?.reduce((s: number, r: any) => s + (r.days_worked || 0), 0)}</TableCell>
-                          <TableCell align="right">{payData.totals?.regular_hours?.toFixed(1)}</TableCell>
-                          <TableCell align="right">{payData.totals?.overtime_hours?.toFixed(1)}</TableCell>
-                          <TableCell align="right">{payData.totals?.total_hours?.toFixed(1)}</TableCell>
+                          <TableCell align="right">{formatHours(payData.totals?.regular_hours)}</TableCell>
+                          <TableCell align="right">{formatHours(payData.totals?.overtime_hours)}</TableCell>
+                          <TableCell align="right">{formatHours(payData.totals?.total_hours)}</TableCell>
                           <TableCell align="right">{formatCurrency(payData.totals?.regular_pay)}</TableCell>
                           <TableCell align="right">{formatCurrency(payData.totals?.overtime_pay)}</TableCell>
                           <TableCell align="right" sx={{ fontSize: '1rem' }}>{formatCurrency(payData.totals?.gross_pay)}</TableCell>
@@ -711,9 +715,9 @@ export default function ReportsPage() {
                             <TableCell>{r.clock_in || '-'}</TableCell>
                             <TableCell>{r.clock_out || <Chip label="Active" size="small" color="success" />}</TableCell>
                             <TableCell align="right">{r.break_minutes || 0}</TableCell>
-                            <TableCell align="right">{r.regular_hours?.toFixed(1)}</TableCell>
-                            <TableCell align="right" sx={{ color: r.overtime_hours > 0 ? 'warning.main' : undefined }}>{r.overtime_hours?.toFixed(1)}</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>{r.total_hours != null ? r.total_hours.toFixed(1) : '-'}</TableCell>
+                            <TableCell align="right">{formatHours(r.regular_hours)}</TableCell>
+                            <TableCell align="right" sx={{ color: r.overtime_hours > 0 ? 'warning.main' : undefined }}>{formatHours(r.overtime_hours)}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>{formatHours(r.total_hours)}</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(r.day_pay)}</TableCell>
                             <TableCell>{r.notes || '-'}</TableCell>
                           </TableRow>
@@ -723,9 +727,9 @@ export default function ReportsPage() {
                           <TableRow sx={{ '& td': { fontWeight: 700, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'grey.900' : 'grey.50', borderTop: '2px solid', borderColor: 'divider' } }}>
                             <TableCell colSpan={3}>TOTALS ({payDetailData.records.length} days)</TableCell>
                             <TableCell align="right">{payDetailData.records.reduce((s: number, r: any) => s + (r.break_minutes || 0), 0)}</TableCell>
-                            <TableCell align="right">{payDetailData.records.reduce((s: number, r: any) => s + (r.regular_hours || 0), 0).toFixed(1)}</TableCell>
-                            <TableCell align="right">{payDetailData.records.reduce((s: number, r: any) => s + (r.overtime_hours || 0), 0).toFixed(1)}</TableCell>
-                            <TableCell align="right">{payDetailData.records.reduce((s: number, r: any) => s + (r.total_hours || 0), 0).toFixed(1)}</TableCell>
+                            <TableCell align="right">{formatHours(payDetailData.records.reduce((s: number, r: any) => s + (r.regular_hours || 0), 0))}</TableCell>
+                            <TableCell align="right">{formatHours(payDetailData.records.reduce((s: number, r: any) => s + (r.overtime_hours || 0), 0))}</TableCell>
+                            <TableCell align="right">{formatHours(payDetailData.records.reduce((s: number, r: any) => s + (r.total_hours || 0), 0))}</TableCell>
                             <TableCell align="right">{formatCurrency(payDetailData.records.reduce((s: number, r: any) => s + (r.day_pay || 0), 0))}</TableCell>
                             <TableCell />
                           </TableRow>
