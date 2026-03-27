@@ -192,7 +192,7 @@ export default function AttendanceHistoryPage() {
                     </TableCell>
                     <TableCell>{r.checkIn || '-'}</TableCell>
                     <TableCell>{r.checkOut || '-'}</TableCell>
-                    <TableCell>{r.totalHours ? `${r.totalHours}h` : '-'}</TableCell>
+                    <TableCell>{r.totalHours ? (() => { const h = Math.floor(r.totalHours!); const m = Math.round((r.totalHours! - h) * 60); if (h === 0) return `${m}m`; if (m === 0) return `${h}h`; return `${h}h ${m}m`; })() : '-'}</TableCell>
                     <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.notes || '-'}
                     </TableCell>
