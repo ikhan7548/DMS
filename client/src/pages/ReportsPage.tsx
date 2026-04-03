@@ -8,14 +8,17 @@ import {
 } from '@mui/material';
 import {
   Download, EventAvailable, AttachMoney, Security, Search,
-  Assessment, PictureAsPdf, Close, People, ArrowBack,
+  Assessment, PictureAsPdf, Close, People, ArrowBack, Edit, ExitToApp,
 } from '@mui/icons-material';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 
 // ─── Types ──────────────────────────────────────────
 
 interface AttendanceRecord {
+  attendance_id?: number;
+  child_id?: number;
+  staff_id?: number;
   date: string;
   name: string;
   type: 'child' | 'staff';
@@ -85,6 +88,13 @@ export default function ReportsPage() {
   const [printIncludeFee, setPrintIncludeFee] = useState(true);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
 
+  // ─── Edit / Checkout state ───
+  const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null);
+  const [editCheckIn, setEditCheckIn] = useState('');
+  const [editCheckOut, setEditCheckOut] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
   // ─── Entity dropdown options ───
   const [childOptions, setChildOptions] = useState<EntityOption[]>([]);
   const [staffOptions, setStaffOptions] = useState<EntityOption[]>([]);
@@ -151,6 +161,30 @@ export default function ReportsPage() {
     } catch (err: any) {
       setAttError(err?.response?.data?.error || 'Failed to generate report');
     } finally { setAttLoading(false); }
+  };
+
+  const openEditDialog = (record: AttendanceRecord) => {
+    setEditRecord(record);
+    setEditCheckIn(record.checkIn || '');
+    setEditCheckOut(record.checkOut || '');
+    setEditReason('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editRecord?.attendance_id) return;
+    setEditSaving(true);
+    try {
+      await api.put(`/attendance/${editRecord.attendance_id}/correct`, {
+        type: editRecord.type === 'child' ? 'child' : 'staff',
+        checkIn: editCheckIn,
+        checkOut: editCheckOut || null,
+        reason: editReason || 'Corrected from reports',
+      });
+      setEditRecord(null);
+      handleGenerateAttendance(); // refresh the report
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Failed to save correction');
+    } finally { setEditSaving(false); }
   };
 
   const entityDropdownItems = (): { id: number; label: string }[] => {
@@ -346,7 +380,7 @@ export default function ReportsPage() {
                 <TableContainer>
                   {(() => {
                     const showFeeCol = attRecords.some(r => r.type === 'child' && (r.hourly_rate || r.daily_rate)) && printIncludeFee;
-                    const colCount = showFeeCol ? 7 : 6;
+                    const colCount = showFeeCol ? 8 : 7;
                     return (
                   <Table size="small">
                     <TableHead>
@@ -358,6 +392,7 @@ export default function ReportsPage() {
                         <TableCell>Check Out / Clock Out</TableCell>
                         <TableCell align="right">Total Hours</TableCell>
                         {showFeeCol && <TableCell align="right">Fee Due</TableCell>}
+                        <TableCell align="center" sx={{ '@media print': { display: 'none' } }}>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -374,6 +409,28 @@ export default function ReportsPage() {
                           <TableCell>{record.checkOut || <Chip label="Still Present" size="small" color="success" />}</TableCell>
                           <TableCell align="right">{formatHours(record.totalHours)}</TableCell>
                           {showFeeCol && <TableCell align="right">{fee != null ? formatCurrency(fee) : '-'}</TableCell>}
+                          <TableCell align="center" sx={{ whiteSpace: 'nowrap', '@media print': { display: 'none' } }}>
+                            {!record.checkOut && record.attendance_id && (
+                              <Tooltip title="Check Out Now">
+                                <IconButton size="small" color="warning" onClick={() => {
+                                  setEditRecord(record);
+                                  setEditCheckIn(record.checkIn || '');
+                                  const now = new Date();
+                                  setEditCheckOut(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
+                                  setEditReason('Late checkout from reports');
+                                }}>
+                                  <ExitToApp fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                            {record.attendance_id && (
+                              <Tooltip title="Edit Times">
+                                <IconButton size="small" onClick={() => openEditDialog(record)}>
+                                  <Edit fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </TableCell>
                         </TableRow>
                         );
                       })}
@@ -884,6 +941,29 @@ export default function ReportsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPrintDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit / Checkout Dialog */}
+      <Dialog open={!!editRecord} onClose={() => setEditRecord(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>{editRecord && !editRecord.checkOut ? 'Check Out / Edit Time' : 'Edit Time Entry'}</DialogTitle>
+        <DialogContent>
+          {editRecord && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {editRecord.name} — {editRecord.date}
+              </Typography>
+              <TextField label="Check In" type="time" value={editCheckIn} onChange={(e) => setEditCheckIn(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
+              <TextField label="Check Out" type="time" value={editCheckOut} onChange={(e) => setEditCheckOut(e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
+              <TextField label="Reason" value={editReason} onChange={(e) => setEditReason(e.target.value)} multiline rows={2} placeholder="Reason for correction" fullWidth />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditRecord(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveEdit} disabled={editSaving || !editCheckIn}>
+            {editSaving ? 'Saving...' : 'Save'}
+          </Button>
         </DialogActions>
       </Dialog>
 

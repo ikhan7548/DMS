@@ -133,6 +133,7 @@ router.get('/attendance', requireAuth, requirePermission('reports_view'), (req: 
       if (reportType === 'children' || reportType === 'all') {
         let childQuery = `
           SELECT
+            ac.id as attendance_id,
             ac.date,
             c.first_name || ' ' || c.last_name as name,
             ac.check_in_time as checkIn,
@@ -174,11 +175,13 @@ router.get('/attendance', requireAuth, requirePermission('reports_view'), (req: 
       if (reportType === 'staff' || reportType === 'all') {
         let staffQuery = `
           SELECT
+            ast.id as attendance_id,
             ast.date,
             s.first_name || ' ' || s.last_name as name,
             ast.clock_in as checkIn,
             ast.clock_out as checkOut,
-            'staff' as type
+            'staff' as type,
+            s.id as staff_id
           FROM attendance_staff ast
           JOIN staff s ON ast.staff_id = s.id
           WHERE ast.date >= ? AND ast.date <= ?
