@@ -3,7 +3,11 @@
   "short_name": "Daycare",
   "description": "Daycare Management System",
   "start_url": "/",
-  "display": "fullscreen",
+  "scope": "/",
+  "display": "standalone",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "background_color": "#121212",
   "theme_color": "#121212",
   "orientation": "any",
