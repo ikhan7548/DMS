@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Grid2 as Grid, Tabs, Tab, Button,
   TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   LinearProgress, Paper, Chip, FormControl, InputLabel, Select, MenuItem,
-  Alert, CircularProgress, Dialog, DialogTitle, DialogContent, IconButton,
+  Alert, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   Tooltip, CardActionArea,
 } from '@mui/material';
 import {
@@ -82,6 +82,8 @@ export default function ReportsPage() {
   const [attLoading, setAttLoading] = useState(false);
   const [attError, setAttError] = useState<string | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [printIncludeFee, setPrintIncludeFee] = useState(true);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
 
   // ─── Entity dropdown options ───
   const [childOptions, setChildOptions] = useState<EntityOption[]>([]);
@@ -196,7 +198,23 @@ export default function ReportsPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  const handlePrintPdf = () => { window.print(); };
+  const hasFeeData = attRecords.some(r => r.type === 'child' && (r.hourly_rate || r.daily_rate));
+  const handlePrintPdf = () => {
+    if (tab === 0 && hasFeeData) {
+      setPrintDialogOpen(true);
+    } else {
+      window.print();
+    }
+  };
+  const handlePrintConfirm = (includeFee: boolean) => {
+    setPrintIncludeFee(includeFee);
+    setPrintDialogOpen(false);
+    setTimeout(() => {
+      window.print();
+      // Reset to show fee on screen after printing
+      setPrintIncludeFee(true);
+    }, 100);
+  };
 
   // ─── Financial Drill-Down ───
   const handleFinDrillDown = async (drillType: string, title: string) => {
@@ -327,7 +345,7 @@ export default function ReportsPage() {
                 </Box>
                 <TableContainer>
                   {(() => {
-                    const showFeeCol = attRecords.some(r => r.type === 'child' && (r.hourly_rate || r.daily_rate));
+                    const showFeeCol = attRecords.some(r => r.type === 'child' && (r.hourly_rate || r.daily_rate)) && printIncludeFee;
                     const colCount = showFeeCol ? 7 : 6;
                     return (
                   <Table size="small">
@@ -371,7 +389,7 @@ export default function ReportsPage() {
                       {attRecords.some(r => r.totalHours != null) && (
                         <Typography variant="body2" fontWeight={600}>Total Hours: {formatHours(attRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0))}</Typography>
                       )}
-                      {attRecords.some(r => calcChildFee(r) != null) && (
+                      {printIncludeFee && attRecords.some(r => calcChildFee(r) != null) && (
                         <Typography variant="body2" fontWeight={700} color="primary">
                           Total Fee: {formatCurrency(attRecords.reduce((sum, r) => sum + (calcChildFee(r) || 0), 0))}
                           {attRecords[0]?.fee_name && <Typography component="span" variant="caption" color="text.secondary"> ({attRecords[0].fee_name})</Typography>}
@@ -847,6 +865,27 @@ export default function ReportsPage() {
           </Grid>
         )
       )}
+
+      {/* Print Option Dialog */}
+      <Dialog open={printDialogOpen} onClose={() => setPrintDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Print Attendance Report</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            This report includes fee data. What would you like to print?
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Button variant="contained" fullWidth onClick={() => handlePrintConfirm(true)}>
+              Include Fee
+            </Button>
+            <Button variant="outlined" fullWidth onClick={() => handlePrintConfirm(false)}>
+              Timesheet Only
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPrintDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Print styles */}
       <style>{`
