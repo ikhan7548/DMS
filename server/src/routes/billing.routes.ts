@@ -65,6 +65,112 @@ router.put('/fees/:id', requireAuth, requirePermission('billing_manage'), (req: 
   }
 });
 
+// GET /api/billing/calculate-fee - Calculate fee from attendance for a child in a date range
+router.get('/calculate-fee', requireAuth, requirePermission('billing_view'), (req: Request, res: Response) => {
+  try {
+    const { child_id, start, end } = req.query;
+    if (!child_id || !start || !end) {
+      return res.status(400).json({ error: 'child_id, start, and end are required' });
+    }
+
+    // Get the child's fee configuration
+    const child = sqlite.prepare(`
+      SELECT c.id, c.first_name, c.last_name, c.rate_tier_id,
+        fc.name as fee_name, fc.hourly_rate, fc.daily_rate, fc.weekly_rate
+      FROM children c
+      LEFT JOIN fee_configurations fc ON c.rate_tier_id = fc.id
+      WHERE c.id = ?
+    `).get(child_id) as any;
+
+    if (!child) {
+      return res.status(404).json({ error: 'Child not found' });
+    }
+    if (!child.rate_tier_id) {
+      return res.status(400).json({ error: 'No fee schedule assigned to this child' });
+    }
+
+    // Get attendance records for the period
+    const records = sqlite.prepare(`
+      SELECT date, check_in_time, check_out_time
+      FROM attendance_child
+      WHERE child_id = ? AND date >= ? AND date <= ?
+      ORDER BY date
+    `).all(child_id, start, end) as any[];
+
+    // Calculate hours per day and totals
+    let totalHours = 0;
+    let daysAttended = 0;
+    const dailyDetails: { date: string; hours: number }[] = [];
+
+    for (const rec of records) {
+      if (!rec.check_in_time || !rec.check_out_time) continue;
+      const [inH, inM] = rec.check_in_time.split(':').map(Number);
+      const [outH, outM] = rec.check_out_time.split(':').map(Number);
+      const hours = (outH + outM / 60) - (inH + inM / 60);
+      if (hours > 0) {
+        totalHours += hours;
+        daysAttended++;
+        dailyDetails.push({ date: rec.date, hours: Math.round(hours * 100) / 100 });
+      }
+    }
+
+    // Calculate fee based on rate type
+    let lineItems: any[] = [];
+    const childName = `${child.first_name} ${child.last_name}`;
+
+    if (child.hourly_rate && child.hourly_rate > 0) {
+      const roundedHours = Math.round(totalHours * 100) / 100;
+      const amount = Math.round(roundedHours * child.hourly_rate * 100) / 100;
+      lineItems.push({
+        description: `${childName} - ${daysAttended} days, ${formatHrs(totalHours)} @ $${child.hourly_rate}/hr`,
+        category: 'tuition',
+        amount,
+        quantity: 1,
+      });
+    } else if (child.daily_rate && child.daily_rate > 0) {
+      const amount = Math.round(daysAttended * child.daily_rate * 100) / 100;
+      lineItems.push({
+        description: `${childName} - ${daysAttended} days @ $${child.daily_rate}/day`,
+        category: 'tuition',
+        amount,
+        quantity: 1,
+      });
+    } else if (child.weekly_rate && child.weekly_rate > 0) {
+      // Count full weeks in the period
+      const startDate = new Date(start as string);
+      const endDate = new Date(end as string);
+      const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const weeks = Math.ceil(diffDays / 7);
+      const amount = Math.round(weeks * child.weekly_rate * 100) / 100;
+      lineItems.push({
+        description: `${childName} - ${weeks} week(s) @ $${child.weekly_rate}/week`,
+        category: 'tuition',
+        amount,
+        quantity: 1,
+      });
+    }
+
+    res.json({
+      child_name: childName,
+      fee_name: child.fee_name,
+      totalHours: Math.round(totalHours * 100) / 100,
+      daysAttended,
+      lineItems,
+      dailyDetails,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+function formatHrs(hours: number): string {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 // ─── Invoices ────────────────────────────────────────
 
 // GET /api/billing/invoices

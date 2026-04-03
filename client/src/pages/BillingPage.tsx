@@ -22,6 +22,7 @@ export default function BillingPage() {
     lineItems: [{ description: 'Weekly Tuition', category: 'tuition', amount: 0, quantity: 1 }],
     notes: '',
   });
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     invoice_id: '', amount: '', method: 'cash', date: new Date().toISOString().split('T')[0],
     reference_number: '', notes: '',
@@ -309,15 +310,25 @@ export default function BillingPage() {
                 const fee = child?.rate_tier_id ? fees.find((f: any) => f.id === child.rate_tier_id) : null;
                 if (!fee) return null;
                 return (
-                  <Button size="small" startIcon={<AutoAwesome />} onClick={() => {
-                    const rate = fee.weekly_rate || fee.daily_rate || fee.hourly_rate || 0;
-                    const desc = fee.weekly_rate ? `Weekly Tuition - ${child.first_name}` : fee.daily_rate ? `Daily Rate - ${child.first_name}` : `Hourly Rate - ${child.first_name}`;
-                    setInvoiceForm({
-                      ...invoiceForm,
-                      lineItems: [{ description: desc, category: 'tuition', amount: rate, quantity: 1 }],
-                    });
+                  <Button size="small" startIcon={<AutoAwesome />} disabled={autoFillLoading || !invoiceForm.period_start || !invoiceForm.period_end} onClick={async () => {
+                    setAutoFillLoading(true);
+                    try {
+                      const res = await api.get('/billing/calculate-fee', {
+                        params: { child_id: invoiceForm.child_id, start: invoiceForm.period_start, end: invoiceForm.period_end },
+                      });
+                      const data = res.data;
+                      if (data.lineItems && data.lineItems.length > 0) {
+                        setInvoiceForm(prev => ({ ...prev, lineItems: data.lineItems }));
+                      } else {
+                        alert(`No attendance records found for ${child.first_name} in the selected period.`);
+                      }
+                    } catch (err: any) {
+                      alert(err.response?.data?.error || 'Failed to calculate fee');
+                    } finally {
+                      setAutoFillLoading(false);
+                    }
                   }}>
-                    Auto-fill Fee ({fee.name})
+                    {autoFillLoading ? 'Calculating...' : `Auto-fill Fee (${fee.name})`}
                   </Button>
                 );
               })()}
