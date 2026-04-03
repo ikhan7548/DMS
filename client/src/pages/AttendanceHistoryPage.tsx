@@ -37,6 +37,7 @@ export default function AttendanceHistoryPage() {
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [typeFilter, setTypeFilter] = useState('all');
+  const [entityFilter, setEntityFilter] = useState<number | ''>('');
 
   // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
@@ -71,7 +72,11 @@ export default function AttendanceHistoryPage() {
     setLoading(true);
     try {
       const res = await api.get('/attendance/history', {
-        params: { startDate, endDate, type: typeFilter !== 'all' ? typeFilter : undefined },
+        params: {
+          startDate, endDate,
+          type: typeFilter !== 'all' ? typeFilter : undefined,
+          entityId: entityFilter !== '' ? entityFilter : undefined,
+        },
       });
       setRecords(res.data);
       setError('');
@@ -79,7 +84,7 @@ export default function AttendanceHistoryPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchHistory(); }, [startDate, endDate, typeFilter]);
+  useEffect(() => { fetchHistory(); }, [startDate, endDate, typeFilter, entityFilter]);
 
   const handleEdit = (record: HistoryRecord) => {
     setEditForm({
@@ -153,12 +158,23 @@ export default function AttendanceHistoryPage() {
             />
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <InputLabel>Type</InputLabel>
-              <Select value={typeFilter} label="Type" onChange={(e) => setTypeFilter(e.target.value)}>
+              <Select value={typeFilter} label="Type" onChange={(e) => { setTypeFilter(e.target.value); setEntityFilter(''); }}>
                 <MenuItem value="all">All</MenuItem>
                 <MenuItem value="children">Children</MenuItem>
                 <MenuItem value="staff">Staff</MenuItem>
               </Select>
             </FormControl>
+            {(typeFilter === 'children' || typeFilter === 'staff') && (
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>{typeFilter === 'children' ? 'Select Child' : 'Select Staff'}</InputLabel>
+                <Select value={entityFilter} label={typeFilter === 'children' ? 'Select Child' : 'Select Staff'} onChange={(e) => setEntityFilter(e.target.value as number | '')}>
+                  <MenuItem value="">All</MenuItem>
+                  {(typeFilter === 'children' ? children : staffList).map((e: any) => (
+                    <MenuItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             <Button variant="outlined" startIcon={<Search />} onClick={fetchHistory}>Search</Button>
           </Box>
         </CardContent>
