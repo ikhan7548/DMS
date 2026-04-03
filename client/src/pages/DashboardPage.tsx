@@ -10,6 +10,7 @@ import {
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import api from '../lib/api';
+import { useAuthStore } from '../stores/authStore';
 
 interface DashboardData {
   children: { total: number; checkedIn: number };
@@ -20,27 +21,45 @@ interface DashboardData {
   upcomingExpirations: any[];
 }
 
+// Route map: permission → path (in priority order for redirect)
+const permissionRoutes: [string, string][] = [
+  ['attendance_checkin', '/attendance'],
+  ['children_view', '/children'],
+  ['staff_view', '/staff'],
+  ['billing_view', '/billing'],
+  ['reports_view', '/reports'],
+  ['settings_view', '/settings'],
+];
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const { hasPermission } = useAuthStore();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const canViewDashboard = hasPermission('reports_view');
 
   const fetchDashboard = useCallback(() => {
+    if (!canViewDashboard) { setLoading(false); return; }
     api.get('/reports/dashboard')
       .then((res) => { setData(res.data); setLastRefresh(new Date()); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [canViewDashboard]);
 
   useEffect(() => {
+    // If user can't view dashboard, redirect to their first allowed page
+    if (!canViewDashboard) {
+      for (const [perm, path] of permissionRoutes) {
+        if (hasPermission(perm)) { navigate(path, { replace: true }); return; }
+      }
+    }
     fetchDashboard();
-    // Auto-refresh every 60 seconds
     const interval = setInterval(fetchDashboard, 60000);
     return () => clearInterval(interval);
-  }, [fetchDashboard]);
+  }, [fetchDashboard, canViewDashboard, hasPermission, navigate]);
 
   if (loading && !data) return <LinearProgress />;
   if (!data) return <Alert severity="error">Failed to load dashboard</Alert>;
