@@ -13,6 +13,7 @@ function InvoicePage({
   invoice,
   settings,
   billToName,
+  billToChildName,
   billToEmail,
   billToPhone,
   billToAddress,
@@ -28,6 +29,7 @@ function InvoicePage({
   invoice: any;
   settings: Record<string, string>;
   billToName: string;
+  billToChildName?: string;
   billToEmail?: string;
   billToPhone?: string;
   billToAddress?: string;
@@ -91,6 +93,7 @@ function InvoicePage({
         <Box sx={{ textAlign: 'right' }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>Bill To:</Typography>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>{billToName}</Typography>
+          {billToChildName && <Typography variant="body2">Child: {billToChildName}</Typography>}
           {billToAddress && <Typography variant="body2">{billToAddress}</Typography>}
           {billToEmail && <Typography variant="body2">{billToEmail}</Typography>}
           {billToPhone && <Typography variant="body2">{billToPhone}</Typography>}
@@ -263,6 +266,8 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
     .filter((p: any) => p.payer_type === 'third_party')
     .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
+  const childName = invoice.child_first_name ? `${invoice.child_first_name} ${invoice.child_last_name}` : undefined;
+
   if (!hasSplit) {
     // Standard single invoice
     return (
@@ -281,6 +286,7 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
           invoice={invoice}
           settings={settings}
           billToName={`${invoice.parent_first_name || invoice.family_first_name || ''} ${invoice.parent_last_name || invoice.family_last_name || ''}`.trim()}
+          billToChildName={childName}
           billToEmail={invoice.parent_email || invoice.family_email}
           billToPhone={invoice.parent_phone || invoice.family_phone}
           billToAddress={invoice.family_address}
@@ -307,6 +313,7 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
         invoice={invoice}
         settings={settings}
         billToName={`${invoice.parent_first_name || invoice.family_first_name || ''} ${invoice.parent_last_name || invoice.family_last_name || ''}`.trim()}
+        billToChildName={childName}
         billToEmail={invoice.parent_email || invoice.family_email}
         billToPhone={invoice.parent_phone || invoice.family_phone}
         billToAddress={invoice.family_address}
@@ -325,6 +332,7 @@ export default function PrintableInvoice({ invoice, settings }: PrintableInvoice
         invoice={invoice}
         settings={settings}
         billToName={thirdPartyName}
+        billToChildName={childName}
         billToAddress={thirdPartyAddress}
         portionLabel={`${thirdPartyName} Portion`}
         portionPct={thirdPartyPct}

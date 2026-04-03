@@ -73,9 +73,11 @@ router.get('/invoices', requireAuth, requirePermission('billing_view'), (req: Re
     const { status, startDate, endDate, familyId } = req.query;
     let query = `
       SELECT i.*,
-        p.first_name as family_first_name, p.last_name as family_last_name
+        p.first_name as family_first_name, p.last_name as family_last_name,
+        c.first_name as child_first_name, c.last_name as child_last_name
       FROM invoices i
       LEFT JOIN parents p ON i.family_id = p.id
+      LEFT JOIN children c ON i.child_id = c.id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -111,9 +113,11 @@ router.get('/invoices/:id', requireAuth, requirePermission('billing_view'), (req
     const invoice = sqlite.prepare(`
       SELECT i.*,
         p.first_name as family_first_name, p.last_name as family_last_name,
-        p.email as family_email, p.phone_cell as family_phone, p.home_address as family_address
+        p.email as family_email, p.phone_cell as family_phone, p.home_address as family_address,
+        ch.first_name as child_first_name, ch.last_name as child_last_name
       FROM invoices i
       LEFT JOIN parents p ON i.family_id = p.id
+      LEFT JOIN children ch ON i.child_id = ch.id
       WHERE i.id = ?
     `).get(req.params.id);
 
@@ -138,7 +142,7 @@ router.get('/invoices/:id', requireAuth, requirePermission('billing_view'), (req
 // POST /api/billing/invoices
 router.post('/invoices', requireAuth, requirePermission('billing_manage'), (req: Request, res: Response) => {
   try {
-    const { family_id, due_date, period_start, period_end, lineItems, notes } = req.body;
+    const { family_id, child_id, due_date, period_start, period_end, lineItems, notes } = req.body;
 
     const subtotal = (lineItems || []).reduce((sum: number, li: any) => sum + ((li.unit_price || li.amount || 0) * (li.quantity || 1)), 0);
     const total = subtotal;
@@ -146,9 +150,9 @@ router.post('/invoices', requireAuth, requirePermission('billing_manage'), (req:
     const invoiceNumber = `INV-${Date.now()}`;
 
     const insertInvoice = sqlite.prepare(`
-      INSERT INTO invoices (invoice_number, family_id, issued_date, due_date, period_start, period_end,
+      INSERT INTO invoices (invoice_number, family_id, child_id, issued_date, due_date, period_start, period_end,
         subtotal, total, amount_paid, balance_due, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?)
     `);
 
     const insertLineItem = sqlite.prepare(`
@@ -158,7 +162,7 @@ router.post('/invoices', requireAuth, requirePermission('billing_manage'), (req:
 
     const transaction = sqlite.transaction(() => {
       const result = insertInvoice.run(
-        invoiceNumber, family_id, today(), due_date,
+        invoiceNumber, family_id, child_id || null, today(), due_date,
         period_start, period_end, subtotal, total, total, notes || null
       );
       const invoiceId = Number(result.lastInsertRowid);

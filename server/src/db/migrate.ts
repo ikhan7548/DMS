@@ -381,6 +381,14 @@ function createTables() {
   } catch {
     // Column already exists — safe to ignore
   }
+
+  // Add child_id to invoices (for per-child invoicing)
+  try {
+    sqlite.exec(`ALTER TABLE invoices ADD COLUMN child_id INTEGER REFERENCES children(id)`);
+    console.log('  Added child_id column to invoices table.');
+  } catch {
+    // Column already exists — safe to ignore
+  }
 }
 
 createTables();

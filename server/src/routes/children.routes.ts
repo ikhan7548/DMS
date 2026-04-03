@@ -26,7 +26,7 @@ router.get('/', requireAuth, requirePermission('children_view'), (req: Request, 
 
     // Attach primary parent info for each child
     const parentQuery = sqlite.prepare(
-      `SELECT p.first_name, p.last_name, p.phone_cell, p.email, cp.relationship
+      `SELECT p.id as parent_id, p.first_name, p.last_name, p.phone_cell, p.email, cp.relationship
        FROM parents p JOIN child_parent cp ON p.id = cp.parent_id
        WHERE cp.child_id = ? ORDER BY p.is_primary DESC LIMIT 1`
     );
@@ -34,6 +34,7 @@ router.get('/', requireAuth, requirePermission('children_view'), (req: Request, 
       const parent = parentQuery.get(child.id) as any;
       return {
         ...child,
+        parent_id: parent?.parent_id || null,
         parent_name: parent ? `${parent.first_name} ${parent.last_name}` : null,
         parent_phone: parent?.phone_cell || null,
         parent_email: parent?.email || null,

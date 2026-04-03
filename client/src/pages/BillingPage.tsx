@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   MenuItem, Select, FormControl, InputLabel, LinearProgress, Paper, Alert,
 } from '@mui/material';
-import { Add, Receipt, Payment, TrendingUp } from '@mui/icons-material';
+import { Add, Receipt, Payment, TrendingUp, AutoAwesome } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 
@@ -18,7 +18,7 @@ export default function BillingPage() {
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState({
-    family_id: '', due_date: '', period_start: '', period_end: '',
+    family_id: '', child_id: '', due_date: '', period_start: '', period_end: '',
     lineItems: [{ description: 'Weekly Tuition', category: 'tuition', amount: 0, quantity: 1 }],
     notes: '',
   });
@@ -41,7 +41,6 @@ export default function BillingPage() {
   const { data: fees = [] } = useQuery({
     queryKey: ['fees'],
     queryFn: () => api.get('/billing/fees').then(r => r.data),
-    enabled: tab === 2,
   });
 
   const { data: aging } = useQuery({
@@ -136,6 +135,7 @@ export default function BillingPage() {
                       <TableCell>Invoice #</TableCell>
                       <TableCell>Date</TableCell>
                       <TableCell>Family</TableCell>
+                      <TableCell>Child</TableCell>
                       <TableCell align="right">Total</TableCell>
                       <TableCell align="right">Paid</TableCell>
                       <TableCell align="right">Balance</TableCell>
@@ -148,6 +148,7 @@ export default function BillingPage() {
                         <TableCell sx={{ fontWeight: 500 }}>{inv.invoice_number}</TableCell>
                         <TableCell>{inv.issued_date}</TableCell>
                         <TableCell>{inv.family_first_name} {inv.family_last_name}</TableCell>
+                        <TableCell>{inv.child_first_name ? `${inv.child_first_name} ${inv.child_last_name}` : '-'}</TableCell>
                         <TableCell align="right">${(inv.total || 0).toFixed(2)}</TableCell>
                         <TableCell align="right">${(inv.amount_paid || 0).toFixed(2)}</TableCell>
                         <TableCell align="right" sx={{ color: inv.balance_due > 0 ? 'error.main' : 'success.main' }}>
@@ -157,7 +158,7 @@ export default function BillingPage() {
                       </TableRow>
                     ))}
                     {invoices.length === 0 && (
-                      <TableRow><TableCell colSpan={7} align="center">No invoices found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} align="center">No invoices found</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -269,6 +270,19 @@ export default function BillingPage() {
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <FormControl fullWidth>
+              <InputLabel>Child</InputLabel>
+              <Select value={invoiceForm.child_id} label="Child" onChange={(e) => {
+                const childId = e.target.value;
+                const child = children.find((c: any) => c.id === childId);
+                const familyId = child?.parent_id || invoiceForm.family_id;
+                setInvoiceForm({ ...invoiceForm, child_id: childId, family_id: familyId });
+              }}>
+                {children.filter((c: any) => c.status === 'active').map((c: any) => (
+                  <MenuItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
               <InputLabel>Family</InputLabel>
               <Select value={invoiceForm.family_id} label="Family" onChange={(e) => setInvoiceForm({ ...invoiceForm, family_id: e.target.value })}>
                 {parents.map((p: any) => (
@@ -288,7 +302,26 @@ export default function BillingPage() {
               <TextField label="Period Start" type="date" value={invoiceForm.period_start} onChange={(e) => setInvoiceForm({ ...invoiceForm, period_start: e.target.value })} InputLabelProps={{ shrink: true }} fullWidth />
               <TextField label="Period End" type="date" value={invoiceForm.period_end} onChange={(e) => setInvoiceForm({ ...invoiceForm, period_end: e.target.value })} InputLabelProps={{ shrink: true }} fullWidth />
             </Box>
-            <Typography variant="subtitle2">Line Items</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="subtitle2">Line Items</Typography>
+              {invoiceForm.child_id && (() => {
+                const child = children.find((c: any) => c.id === invoiceForm.child_id);
+                const fee = child?.rate_tier_id ? fees.find((f: any) => f.id === child.rate_tier_id) : null;
+                if (!fee) return null;
+                return (
+                  <Button size="small" startIcon={<AutoAwesome />} onClick={() => {
+                    const rate = fee.weekly_rate || fee.daily_rate || fee.hourly_rate || 0;
+                    const desc = fee.weekly_rate ? `Weekly Tuition - ${child.first_name}` : fee.daily_rate ? `Daily Rate - ${child.first_name}` : `Hourly Rate - ${child.first_name}`;
+                    setInvoiceForm({
+                      ...invoiceForm,
+                      lineItems: [{ description: desc, category: 'tuition', amount: rate, quantity: 1 }],
+                    });
+                  }}>
+                    Auto-fill Fee ({fee.name})
+                  </Button>
+                );
+              })()}
+            </Box>
             {invoiceForm.lineItems.map((li, idx) => (
               <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <TextField label="Description" value={li.description} size="small" sx={{ flex: 2 }}

@@ -235,6 +235,11 @@ export default function InvoiceDetailPage() {
                   <Typography variant="body1" fontWeight={600}>
                     {invoice.family_first_name} {invoice.family_last_name}
                   </Typography>
+                  {invoice.child_first_name && (
+                    <Typography variant="body2" color="text.secondary">
+                      Child: {invoice.child_first_name} {invoice.child_last_name}
+                    </Typography>
+                  )}
                   {invoice.family_email && <Typography variant="body2">{invoice.family_email}</Typography>}
                   {invoice.family_phone && <Typography variant="body2">{invoice.family_phone}</Typography>}
                   {invoice.family_address && <Typography variant="body2">{invoice.family_address}</Typography>}
