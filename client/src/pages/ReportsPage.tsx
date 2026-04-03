@@ -22,6 +22,10 @@ interface AttendanceRecord {
   checkIn: string | null;
   checkOut: string | null;
   totalHours: number | null;
+  hourly_rate?: number | null;
+  daily_rate?: number | null;
+  weekly_rate?: number | null;
+  fee_name?: string | null;
 }
 
 interface EntityOption {
@@ -39,6 +43,13 @@ function formatHours(hours?: number | null): string {
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
+}
+
+function calcChildFee(record: AttendanceRecord): number | null {
+  if (record.type !== 'child' || record.totalHours == null) return null;
+  if (record.hourly_rate) return Math.round(record.totalHours * record.hourly_rate * 100) / 100;
+  if (record.daily_rate) return record.daily_rate;
+  return null;
 }
 
 function formatCurrency(amount?: number | null): string {
@@ -315,6 +326,10 @@ export default function ReportsPage() {
                   </Typography>
                 </Box>
                 <TableContainer>
+                  {(() => {
+                    const showFeeCol = attRecords.some(r => r.type === 'child' && (r.hourly_rate || r.daily_rate));
+                    const colCount = showFeeCol ? 7 : 6;
+                    return (
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: (theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100' } }}>
@@ -324,12 +339,15 @@ export default function ReportsPage() {
                         <TableCell>Check In / Clock In</TableCell>
                         <TableCell>Check Out / Clock Out</TableCell>
                         <TableCell align="right">Total Hours</TableCell>
+                        {showFeeCol && <TableCell align="right">Fee Due</TableCell>}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {attRecords.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} align="center"><Typography color="text.secondary" sx={{ py: 4 }}>No records found for the selected criteria.</Typography></TableCell></TableRow>
-                      ) : attRecords.map((record, idx) => (
+                        <TableRow><TableCell colSpan={colCount} align="center"><Typography color="text.secondary" sx={{ py: 4 }}>No records found for the selected criteria.</Typography></TableCell></TableRow>
+                      ) : attRecords.map((record, idx) => {
+                        const fee = calcChildFee(record);
+                        return (
                         <TableRow key={`${record.type}-${idx}-${record.date}`} hover>
                           <TableCell>{record.date}</TableCell>
                           <TableCell><Typography fontWeight={500}>{record.name}</Typography></TableCell>
@@ -337,17 +355,29 @@ export default function ReportsPage() {
                           <TableCell>{record.checkIn || '-'}</TableCell>
                           <TableCell>{record.checkOut || <Chip label="Still Present" size="small" color="success" />}</TableCell>
                           <TableCell align="right">{formatHours(record.totalHours)}</TableCell>
+                          {showFeeCol && <TableCell align="right">{fee != null ? formatCurrency(fee) : '-'}</TableCell>}
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
+                    );
+                  })()}
                 </TableContainer>
                 {attRecords.length > 0 && (
-                  <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between' }}>
+                  <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
                     <Typography variant="body2" fontWeight={600}>Total Records: {attRecords.length}</Typography>
-                    {attRecords.some(r => r.totalHours != null) && (
-                      <Typography variant="body2" fontWeight={600}>Total Hours: {formatHours(attRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0))}</Typography>
-                    )}
+                    <Box sx={{ display: 'flex', gap: 3 }}>
+                      {attRecords.some(r => r.totalHours != null) && (
+                        <Typography variant="body2" fontWeight={600}>Total Hours: {formatHours(attRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0))}</Typography>
+                      )}
+                      {attRecords.some(r => calcChildFee(r) != null) && (
+                        <Typography variant="body2" fontWeight={700} color="primary">
+                          Total Fee: {formatCurrency(attRecords.reduce((sum, r) => sum + (calcChildFee(r) || 0), 0))}
+                          {attRecords[0]?.fee_name && <Typography component="span" variant="caption" color="text.secondary"> ({attRecords[0].fee_name})</Typography>}
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
                 )}
               </Card>

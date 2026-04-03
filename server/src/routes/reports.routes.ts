@@ -137,9 +137,16 @@ router.get('/attendance', requireAuth, requirePermission('reports_view'), (req: 
             c.first_name || ' ' || c.last_name as name,
             ac.check_in_time as checkIn,
             ac.check_out_time as checkOut,
-            'child' as type
+            'child' as type,
+            c.id as child_id,
+            c.rate_tier_id,
+            fc.hourly_rate,
+            fc.daily_rate,
+            fc.weekly_rate,
+            fc.name as fee_name
           FROM attendance_child ac
           JOIN children c ON ac.child_id = c.id
+          LEFT JOIN fee_configurations fc ON c.rate_tier_id = fc.id
           WHERE ac.date >= ? AND ac.date <= ?
         `;
         const childParams: (string | number)[] = [start, end];
